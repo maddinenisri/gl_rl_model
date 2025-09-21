@@ -40,45 +40,71 @@ else
 fi
 
 echo ""
-echo "🐍 Setting up conda environment..."
+echo "🐍 Setting up environment..."
 
-# Activate conda environment
-source /home/ec2-user/anaconda3/bin/activate
+# Check if conda is available
+if [ -f "/home/ec2-user/anaconda3/bin/conda" ]; then
+    source /home/ec2-user/anaconda3/bin/activate
 
-# Try to use pytorch environment first, otherwise use base
-conda activate pytorch_p310 2>/dev/null || \
-conda activate conda_pytorch_p310 2>/dev/null || \
-echo "Using base environment"
+    # Try to use pytorch environment first, otherwise use base
+    conda activate pytorch_p310 2>/dev/null || \
+    conda activate conda_pytorch_p310 2>/dev/null || \
+    echo "Using base environment"
 
-echo "Current conda environment: $CONDA_DEFAULT_ENV"
+    echo "Current conda environment: $CONDA_DEFAULT_ENV"
+    USE_CONDA=true
+else
+    echo "Conda not found, using pip instead"
+    USE_CONDA=false
+fi
+
 echo ""
+echo "📦 Installing dependencies..."
 
-echo "📦 Installing dependencies via conda..."
-echo "This approach avoids build issues..."
+if [ "$USE_CONDA" = true ]; then
+    echo "Attempting conda installation (may have limited support on t2.medium)..."
 
-# Install PyTorch and core ML packages via conda
-conda install -y pytorch torchvision torchaudio cpuonly -c pytorch -q
+    # For t2.medium, we need to be more careful with conda packages
+    # Install only essential packages via conda to avoid conflicts
 
-# Install transformers ecosystem via conda-forge
-conda install -y -c conda-forge \
-    transformers \
-    datasets \
-    accelerate \
-    sentencepiece \
-    protobuf \
-    -q
+    # Try to install sentencepiece first (the main problematic package)
+    conda install -y -c conda-forge sentencepiece -q 2>/dev/null || {
+        echo "⚠️ Conda install failed, falling back to pip..."
+        USE_CONDA=false
+    }
+fi
 
-# Install additional packages via conda-forge
-conda install -y -c conda-forge \
-    pandas \
-    numpy \
-    scikit-learn \
-    matplotlib \
-    seaborn \
-    tqdm \
-    jupyter \
-    ipywidgets \
-    -q
+# If conda failed or not available, use pip with pre-built wheels
+if [ "$USE_CONDA" = false ] || [ "$USE_CONDA" = true ]; then
+    echo "Installing core packages via pip..."
+
+    # Install PyTorch CPU version
+    pip install torch --index-url https://download.pytorch.org/whl/cpu -q 2>/dev/null || \
+    pip install torch -q
+
+    # Install transformers and related packages
+    pip install -q transformers datasets accelerate 2>/dev/null
+
+    # Install PEFT and TRL
+    pip install -q peft trl 2>/dev/null || {
+        echo "Installing peft and trl with minimal dependencies..."
+        pip install -q --no-deps peft trl
+        pip install -q huggingface-hub tokenizers
+    }
+
+    # Try to install sentencepiece using pre-built wheel
+    pip install -q --only-binary :all: sentencepiece 2>/dev/null || {
+        # If wheel fails, try with no build isolation
+        pip install -q sentencepiece --no-build-isolation 2>/dev/null || {
+            # Last resort: install without sentencepiece
+            echo "⚠️ sentencepiece installation failed"
+            echo "Some tokenizer features may be limited"
+        }
+    }
+
+    # Install other packages
+    pip install -q protobuf pandas numpy scikit-learn matplotlib seaborn tqdm jupyter ipywidgets 2>/dev/null || true
+fi
 
 echo ""
 echo "📦 Installing remaining packages via pip..."
