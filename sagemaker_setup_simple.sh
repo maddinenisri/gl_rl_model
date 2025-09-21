@@ -56,7 +56,17 @@ echo "Installing PyTorch (CPU)..."
 pip install torch --index-url https://download.pytorch.org/whl/cpu -q
 
 echo "Installing Transformers ecosystem..."
-pip install transformers datasets accelerate huggingface-hub tokenizers -q
+# Install without datasets first to avoid pyarrow build issues
+pip install transformers huggingface-hub tokenizers accelerate -q
+
+# Try to install datasets (may fail due to pyarrow)
+echo "Attempting datasets installation..."
+pip install datasets -q 2>/dev/null || {
+    echo "⚠️ datasets installation failed (pyarrow build issue)"
+    echo "Installing datasets without pyarrow dependency..."
+    pip install datasets --no-deps -q
+    pip install fsspec aiohttp multiprocess dill pandas tqdm requests -q
+}
 
 echo "Installing fine-tuning libraries..."
 pip install peft trl -q
