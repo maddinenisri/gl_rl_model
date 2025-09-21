@@ -109,6 +109,36 @@ temp/
 *.swp
 *.temp
 
+# Terraform
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan
+.terraform/
+.terraform.lock.hcl
+terraform.tfvars
+*.auto.tfvars
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+crash.log
+crash.*.log
+
+# Terraform Lambda packages
+lambda/*.zip
+terraform/lambda/*.zip
+
+# Local scripts and configs
+fix_*.py
+sagemaker_init.py
+colab_utils.py
+requirements_colab.txt
+README_*.md
+TEST_*.md
+
 # Database
 *.db
 *.sqlite
