@@ -1,0 +1,238 @@
+{
+  "business_entities": {
+    "project": {
+      "description": "Project management and tracking",
+      "primary_tables": ["SRM_PROJECTS", "PAC_MNT_PROJECTS"],
+      "related_tables": ["PROJCNTRTS", "PROJSTAFF", "PROJEVISION", "CLNTRESPONS"],
+      "key_fields": ["Project_ID", "Project_Code", "Project_Name"],
+      "common_queries": [
+        "active projects",
+        "project budget",
+        "project timeline",
+        "project resources"
+      ]
+    },
+    "company": {
+      "description": "Company and organization data",
+      "primary_tables": ["SRM_COMPANIES"],
+      "related_tables": ["SRM_CONTACTS", "BIZ_COM_SUP_PROPERTIES", "CLNTSUPP"],
+      "key_fields": ["Company_ID", "Company_Code", "Company_Name"],
+      "common_queries": [
+        "company projects",
+        "company contacts",
+        "company contracts",
+        "supplier information"
+      ]
+    },
+    "resource": {
+      "description": "Resource allocation and management",
+      "primary_tables": ["PAC_MNT_RESOURCES"],
+      "related_tables": ["PROJSTAFF"],
+      "key_fields": ["Resource_Code", "Resource_Name", "Resource_Type"],
+      "common_queries": [
+        "available resources",
+        "resource allocation",
+        "resource utilization",
+        "resource costs"
+      ]
+    },
+    "contract": {
+      "description": "Contract management",
+      "primary_tables": ["PROJCNTRTS"],
+      "related_tables": ["SRM_PROJECTS", "SRM_COMPANIES", "PAC_MNT_PROJECTS"],
+      "key_fields": ["Contract_ID", "Contract_Number", "Contract_Value"],
+      "common_queries": [
+        "active contracts",
+        "contract values",
+        "contract timeline",
+        "contract terms"
+      ]
+    },
+    "staff": {
+      "description": "Staff assignments and allocations",
+      "primary_tables": ["PROJSTAFF"],
+      "related_tables": ["PAC_MNT_RESOURCES", "PAC_MNT_PROJECTS"],
+      "key_fields": ["Staff_ID", "Resource_Code", "Project_Code"],
+      "common_queries": [
+        "staff assignments",
+        "team composition",
+        "allocation percentage",
+        "billing rates"
+      ]
+    },
+    "client": {
+      "description": "Client support and interactions",
+      "primary_tables": ["CLNTSUPP", "CLNTRESPONS"],
+      "related_tables": ["SRM_COMPANIES", "CLNTCLASS"],
+      "key_fields": ["Support_ID", "Response_ID", "Company_Code"],
+      "common_queries": [
+        "support tickets",
+        "client responses",
+        "ticket status",
+        "priority issues"
+      ]
+    },
+    "budget": {
+      "description": "Budget and financial tracking",
+      "primary_tables": ["PAC_MNT_PROJECTS"],
+      "related_tables": ["PROJCNTRTS", "PROJSTAFF"],
+      "key_fields": ["Budget", "Actual_Cost", "Revenue"],
+      "common_queries": [
+        "budget vs actual",
+        "cost overruns",
+        "revenue tracking",
+        "profitability"
+      ]
+    },
+    "opportunity": {
+      "description": "Business opportunities and pipeline",
+      "primary_tables": ["BIZ_OPP_GEN_PROPERTIES"],
+      "related_tables": ["SRM_COMPANIES"],
+      "key_fields": ["Opportunity_ID", "Estimated_Value", "Probability"],
+      "common_queries": [
+        "open opportunities",
+        "pipeline value",
+        "opportunity stage",
+        "win probability"
+      ]
+    }
+  },
+  "table_relationships": {
+    "SRM_COMPANIES": {
+      "has_many": ["SRM_PROJECTS", "SRM_CONTACTS", "BIZ_OPP_GEN_PROPERTIES"],
+      "referenced_by": ["CLNTSUPP", "PROJCNTRTS", "BIZ_COM_SUP_PROPERTIES"],
+      "join_conditions": {
+        "SRM_PROJECTS": "SRM_COMPANIES.Company_ID = SRM_PROJECTS.Company_ID",
+        "SRM_CONTACTS": "SRM_COMPANIES.Company_ID = SRM_CONTACTS.Company_ID",
+        "CLNTSUPP": "SRM_COMPANIES.Company_Code = CLNTSUPP.Company_Code",
+        "PROJCNTRTS": "SRM_COMPANIES.Company_Code = PROJCNTRTS.Company_Code"
+      }
+    },
+    "PAC_MNT_PROJECTS": {
+      "has_many": ["PROJCNTRTS", "PROJSTAFF", "PROJEVISION", "CLNTRESPONS"],
+      "referenced_by": [],
+      "join_conditions": {
+        "PROJCNTRTS": "PAC_MNT_PROJECTS.Project_Code = PROJCNTRTS.Project_Code",
+        "PROJSTAFF": "PAC_MNT_PROJECTS.Project_Code = PROJSTAFF.Project_Code",
+        "PROJEVISION": "PAC_MNT_PROJECTS.Project_Code = PROJEVISION.Project_Code",
+        "CLNTRESPONS": "PAC_MNT_PROJECTS.Project_Code = CLNTRESPONS.Project_Code"
+      }
+    },
+    "PAC_MNT_RESOURCES": {
+      "has_many": ["PROJSTAFF"],
+      "referenced_by": [],
+      "join_conditions": {
+        "PROJSTAFF": "PAC_MNT_RESOURCES.Resource_Code = PROJSTAFF.Resource_Code"
+      }
+    },
+    "PROJSTAFF": {
+      "has_many": [],
+      "referenced_by": ["PAC_MNT_PROJECTS", "PAC_MNT_RESOURCES"],
+      "join_conditions": {
+        "PAC_MNT_PROJECTS": "PROJSTAFF.Project_Code = PAC_MNT_PROJECTS.Project_Code",
+        "PAC_MNT_RESOURCES": "PROJSTAFF.Resource_Code = PAC_MNT_RESOURCES.Resource_Code"
+      }
+    }
+  },
+  "query_patterns": {
+    "aggregations": {
+      "count": {
+        "template": "SELECT COUNT(*) FROM {table} WHERE {condition}",
+        "examples": [
+          "Count active projects",
+          "Count resources per project",
+          "Count open support tickets"
+        ]
+      },
+      "sum": {
+        "template": "SELECT SUM({column}) FROM {table} WHERE {condition}",
+        "examples": [
+          "Sum project budgets",
+          "Total contract values",
+          "Total resource costs"
+        ]
+      },
+      "average": {
+        "template": "SELECT AVG({column}) FROM {table} WHERE {condition}",
+        "examples": [
+          "Average project duration",
+          "Average resource utilization",
+          "Average contract value"
+        ]
+      }
+    },
+    "joins": {
+      "inner_join": {
+        "template": "SELECT {columns} FROM {table1} INNER JOIN {table2} ON {condition}",
+        "examples": [
+          "Projects with their companies",
+          "Resources with their assignments",
+          "Contracts with project details"
+        ]
+      },
+      "left_join": {
+        "template": "SELECT {columns} FROM {table1} LEFT JOIN {table2} ON {condition}",
+        "examples": [
+          "All projects with optional contracts",
+          "All companies with their contacts",
+          "All resources with optional assignments"
+        ]
+      }
+    },
+    "filters": {
+      "date_range": {
+        "template": "{date_column} BETWEEN '{start_date}' AND '{end_date}'",
+        "examples": [
+          "Projects started this year",
+          "Contracts expiring next month",
+          "Support tickets from last week"
+        ]
+      },
+      "status": {
+        "template": "Status = '{status_value}'",
+        "examples": [
+          "Active projects",
+          "Available resources",
+          "Open tickets"
+        ]
+      },
+      "comparison": {
+        "template": "{column} {operator} {value}",
+        "examples": [
+          "Budget > 100000",
+          "Allocation_Percent >= 50",
+          "Priority = 'High'"
+        ]
+      }
+    }
+  },
+  "business_rules": {
+    "project_constraints": [
+      "End_Date must be after Start_Date",
+      "Actual_Cost should not exceed Budget",
+      "Project_Code must be unique"
+    ],
+    "resource_constraints": [
+      "Total allocation cannot exceed 100% capacity",
+      "Resource must be available for assignment",
+      "Cost_Rate should be less than Billing_Rate"
+    ],
+    "contract_constraints": [
+      "Contract must have associated project",
+      "Contract value should match project budget",
+      "Contract dates should align with project dates"
+    ]
+  },
+  "common_abbreviations": {
+    "SRM": "Supplier Relationship Management",
+    "PAC": "Project Accounting",
+    "MNT": "Maintenance",
+    "CLNT": "Client",
+    "PROJ": "Project",
+    "BIZ": "Business",
+    "OPP": "Opportunity",
+    "GEN": "General",
+    "SUP": "Supplier",
+    "COM": "Company"
+  }
+}
