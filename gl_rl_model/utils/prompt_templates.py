@@ -98,6 +98,16 @@ class SQLPromptTemplates:
 
         # Add examples
         for i, example in enumerate(examples[:3], 1):  # Limit to 3 examples
+            # Handle both tuple and dictionary formats
+            if isinstance(example, (tuple, list)):
+                # Convert tuple/list to dictionary format
+                if len(example) >= 2:
+                    example = {"query": example[0], "sql": example[1]}
+                    if len(example) > 2:
+                        example["reasoning"] = example[2]
+                else:
+                    continue  # Skip malformed examples
+
             prompt += "<|im_start|>user\n"
             prompt += f"Example {i}:\n"
             if 'schema' in example:

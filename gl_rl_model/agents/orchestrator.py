@@ -40,6 +40,7 @@ class OrchestratorAgent(BaseAgent):
         self.agent_registry: Dict[str, BaseAgent] = {}
         self.active_sessions: Dict[str, Dict[str, Any]] = {}
         self.workflow_history: List[Dict[str, Any]] = []
+        self.max_history_size: int = 100  # Maximum number of workflows to keep in history
 
     async def initialize(self) -> bool:
         """
@@ -428,11 +429,23 @@ class OrchestratorAgent(BaseAgent):
 
         # Add training-specific results if in training mode
         if session["mode"] == "train" and "reward" in results:
-            final_result["training"] = {
-                "rewards": results["reward"]["rewards"],
-                "total_reward": results["reward"]["total_reward"],
-                "feedback": results["reward"]["feedback"]
-            }
+            reward_data = results["reward"]
+            # Handle different reward result structures
+            if "rewards" in reward_data:
+                rewards = reward_data["rewards"]
+                # Check if total is nested under rewards or at the top level
+                total_reward = rewards.get("total", 0.0) if isinstance(rewards, dict) else 0.0
+            else:
+                rewards = {}
+                total_reward = 0.0
+
+            # Check for total_reward in metadata if not found
+            if total_reward == 0.0 and "metadata" in reward_data:
+                total_reward = reward_data["metadata"].get("total_reward", 0.0)
+
+            final_result["rewards"] = rewards
+            final_result["total_reward"] = total_reward
+            final_result["feedback"] = reward_data.get("feedback", [])
 
         return final_result
 
@@ -556,5 +569,5 @@ Step 4: Constructed SELECT statement with necessary joins.
         })
 
         # Keep only last 100 entries
-        if len(self.workflow_history) > 100:
-            self.workflow_history = self.workflow_history[-100:]
+        if len(self.workflow_history) > self.max_history_size:
+            self.workflow_history = self.workflow_history[-self.max_history_size:]
