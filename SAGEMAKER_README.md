@@ -4,12 +4,17 @@
 
 After opening your SageMaker notebook instance, run ONE of these commands:
 
-### Option 1: Conda-based Setup (Recommended - No Build Issues)
+### Option 1: Simple Setup (Recommended - Works on t2.medium)
+```bash
+cd /home/ec2-user/SageMaker/gl_rl_model && bash sagemaker_setup_simple.sh
+```
+
+### Option 2: Conda Setup (If conda packages needed)
 ```bash
 cd /home/ec2-user/SageMaker/gl_rl_model && bash sagemaker_setup_conda.sh
 ```
 
-### Option 2: Standard Setup
+### Option 3: Standard Setup (Full featured)
 ```bash
 cd /home/ec2-user/SageMaker/gl_rl_model && bash sagemaker_setup.sh
 ```
