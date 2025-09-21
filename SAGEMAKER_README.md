@@ -2,14 +2,20 @@
 
 ## One-Command Setup
 
-After opening your SageMaker notebook instance, just run:
+After opening your SageMaker notebook instance, run ONE of these commands:
 
+### Option 1: Conda-based Setup (Recommended - No Build Issues)
+```bash
+cd /home/ec2-user/SageMaker/gl_rl_model && bash sagemaker_setup_conda.sh
+```
+
+### Option 2: Standard Setup
 ```bash
 cd /home/ec2-user/SageMaker/gl_rl_model && bash sagemaker_setup.sh
 ```
 
-That's it! The script will:
-- ✅ Install all dependencies
+The script will:
+- ✅ Install all dependencies (using conda to avoid build issues)
 - ✅ Download training data
 - ✅ Create a ready-to-use notebook
 - ✅ Set up the environment

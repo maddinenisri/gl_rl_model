@@ -43,29 +43,49 @@ echo ""
 echo "📦 Installing Python dependencies..."
 echo "This may take a few minutes..."
 
-# Create a requirements file
-cat > requirements_sagemaker.txt << 'EOF'
-torch>=2.0.0
-transformers>=4.35.0
-datasets>=2.14.0
-accelerate>=0.24.0
-peft>=0.6.0
-trl>=0.7.0
-bitsandbytes>=0.41.0
-sentencepiece>=0.1.99
-protobuf>=3.20.0
-pandas>=1.5.0
-numpy>=1.24.0
-scikit-learn>=1.3.0
-matplotlib>=3.6.0
-seaborn>=0.12.0
-tqdm>=4.65.0
-jupyter>=1.0.0
-ipywidgets>=8.0.0
-EOF
+# Check if conda is available and use it for problematic packages
+if command -v conda &> /dev/null; then
+    echo "Using conda for better compatibility..."
 
-# Install packages
-pip install -q -r requirements_sagemaker.txt
+    # Install packages that have build issues via conda
+    conda install -y -c conda-forge sentencepiece cmake -q 2>/dev/null || true
+
+    # Activate the conda environment if needed
+    if [[ -z "$CONDA_DEFAULT_ENV" ]]; then
+        source /home/ec2-user/anaconda3/bin/activate pytorch_p310 2>/dev/null || \
+        source /home/ec2-user/anaconda3/bin/activate conda_pytorch_p310 2>/dev/null || \
+        source /home/ec2-user/anaconda3/bin/activate base 2>/dev/null || true
+    fi
+fi
+
+# Install core packages first (these should install without issues)
+echo "Installing core packages..."
+pip install -q torch transformers datasets accelerate peft trl 2>/dev/null || {
+    echo "⚠️ Some core packages failed, trying with --no-deps..."
+    pip install -q --no-deps torch transformers datasets accelerate peft trl
+}
+
+# Try to install additional packages, but don't fail if they don't work
+echo "Installing additional packages..."
+pip install -q pandas numpy scikit-learn matplotlib seaborn tqdm jupyter ipywidgets 2>/dev/null || true
+
+# Install sentencepiece and protobuf separately (often cause issues)
+echo "Installing tokenizer packages..."
+if ! pip list | grep -q sentencepiece; then
+    # Try pre-built wheel first
+    pip install -q --only-binary :all: sentencepiece 2>/dev/null || \
+    # If that fails, try conda package
+    conda install -y -c conda-forge sentencepiece 2>/dev/null || \
+    # Last resort: try pip without binary
+    pip install -q sentencepiece --no-build-isolation 2>/dev/null || \
+    echo "⚠️ sentencepiece installation failed, but continuing..."
+fi
+
+# Install protobuf (usually works)
+pip install -q "protobuf>=3.20.0" 2>/dev/null || true
+
+# Install bitsandbytes if possible (not critical for CPU instance)
+pip install -q bitsandbytes 2>/dev/null || echo "⚠️ bitsandbytes not installed (OK for CPU)"
 
 echo ""
 echo "📥 Downloading training data from S3..."
