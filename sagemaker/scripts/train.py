@@ -54,37 +54,37 @@ if IS_SAGEMAKER_TRAINING:
         print(f"Installing {package}...")
         subprocess.check_call([sys.executable, '-m', 'pip', 'install', package])
 
-import torch
-import numpy as np
-
-# Try to import with fallback for LRScheduler issue
 try:
-    from transformers import (
-        AutoModelForCausalLM,
-        AutoTokenizer,
-        TrainingArguments,
-        Trainer,
-        DataCollatorForSeq2Seq
-    )
-except ImportError as e:
-    if "LRScheduler" in str(e):
-        print("Working around LRScheduler import issue...")
-        # Temporary workaround for LRScheduler issue
-        import transformers.optimization
-        if not hasattr(transformers.optimization, 'LRScheduler'):
-            from torch.optim.lr_scheduler import LambdaLR as LRScheduler
-            transformers.optimization.LRScheduler = LRScheduler
-    # Retry import
-    from transformers import (
-        AutoModelForCausalLM,
-        AutoTokenizer,
-        TrainingArguments,
-        Trainer,
-        DataCollatorForSeq2Seq
-    )
+    import torch
+    import numpy as np
+    print(f"PyTorch version: {torch.__version__}")
+    print(f"CUDA available: {torch.cuda.is_available()}")
+    if torch.cuda.is_available():
+        print(f"GPU: {torch.cuda.get_device_name(0)}")
 
-from datasets import load_dataset
-from peft import LoraConfig, get_peft_model, TaskType
+    from transformers import (
+        AutoModelForCausalLM,
+        AutoTokenizer,
+        TrainingArguments,
+        Trainer,
+        DataCollatorForSeq2Seq
+    )
+    import transformers
+    print(f"Transformers version: {transformers.__version__}")
+
+    from datasets import load_dataset
+    import datasets
+    print(f"Datasets version: {datasets.__version__}")
+
+    from peft import LoraConfig, get_peft_model, TaskType
+    import peft
+    print(f"PEFT version: {peft.__version__}")
+
+except Exception as e:
+    print(f"ERROR during imports: {str(e)}")
+    import traceback
+    traceback.print_exc()
+    raise
 
 # Setup logging
 logging.basicConfig(
@@ -375,8 +375,10 @@ def parse_args():
     parser.add_argument('--lora_dropout', type=float, default=0.05)
 
     # Optimization parameters
-    parser.add_argument('--fp16', type=bool, default=True)
-    parser.add_argument('--gradient_checkpointing', type=bool, default=True)
+    parser.add_argument('--fp16', type=lambda x: str(x).lower() in ['true', '1', 'yes'],
+                       default=True, help='Use fp16 training')
+    parser.add_argument('--gradient_checkpointing', type=lambda x: str(x).lower() in ['true', '1', 'yes'],
+                       default=True, help='Use gradient checkpointing')
 
     # Output parameters
     parser.add_argument('--save_steps', type=int, default=500)
@@ -388,17 +390,42 @@ def parse_args():
 
 def main():
     """Main entry point"""
-    args = parse_args()
+    try:
+        print("=" * 60)
+        print("GL RL Model Training Starting...")
+        print("=" * 60)
 
-    # Log GPU information if available
-    if torch.cuda.is_available():
-        logger.info(f"GPU: {torch.cuda.get_device_name(0)}")
-        logger.info(f"GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.2f} GB")
+        args = parse_args()
+        print(f"Arguments: {vars(args)}")
 
-    # Initialize and run trainer
-    trainer = GLRLTrainer(args)
-    trainer.train()
+        # Log GPU information if available
+        if torch.cuda.is_available():
+            logger.info(f"GPU: {torch.cuda.get_device_name(0)}")
+            logger.info(f"GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.2f} GB")
+        else:
+            logger.warning("No GPU available, using CPU")
+
+        # Initialize and run trainer
+        print("Initializing trainer...")
+        trainer = GLRLTrainer(args)
+
+        print("Starting training...")
+        trainer.train()
+
+        print("Training completed successfully!")
+
+    except Exception as e:
+        print(f"ERROR in main: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        # Re-raise to ensure SageMaker sees the error
+        raise
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        print(f"FATAL ERROR: {str(e)}")
+        import sys
+        sys.exit(1)
