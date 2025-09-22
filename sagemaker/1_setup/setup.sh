@@ -41,12 +41,18 @@ else
 fi
 
 echo ""
+echo "🔧 Fixing GLIBCXX issue first..."
+# Update conda and libstdc++ to fix GLIBCXX error
+conda update -n base -c defaults conda -y -q
+conda install -c conda-forge libstdcxx-ng -y -q
+
+echo ""
 echo "📦 Installing dependencies..."
 echo ""
 
-# Step 1: Install compiled packages with conda (avoids CMake issues)
+# Step 1: Install compiled packages with conda (specific versions to avoid conflicts)
 echo "Step 1/4: Installing compiled packages with conda..."
-conda install -c conda-forge sentencepiece pyarrow -y -q
+conda install -c conda-forge sentencepiece pyarrow=15.0.0 -y -q
 
 # Step 2: Install PyTorch
 echo ""
@@ -56,12 +62,17 @@ pip install -q torch torchvision torchaudio --index-url https://download.pytorch
 # Step 3: Install ML libraries
 echo ""
 echo "Step 3/4: Installing ML libraries..."
-pip install -q transformers datasets peft trl accelerate huggingface-hub tokenizers
+pip install -q transformers 'datasets>=2.14.0,<3.0.0' peft trl accelerate huggingface-hub tokenizers
 
-# Step 4: Install utilities and fix dependencies
+# Step 4: Fix version conflicts for SageMaker compatibility
 echo ""
-echo "Step 4/4: Installing utilities..."
-pip install -q --upgrade numpy pandas protobuf tqdm fsspec aiohttp multiprocess>=0.70.18
+echo "Step 4/4: Fixing version conflicts..."
+pip install -q \
+    'multiprocess==0.70.16' \
+    'fsspec==2025.7.0' \
+    'numpy==1.26.4' \
+    'protobuf>=3.12,<6.32' \
+    pandas tqdm aiohttp
 
 echo ""
 echo "📥 Setting up training data..."
