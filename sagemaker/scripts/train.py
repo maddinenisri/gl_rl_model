@@ -19,23 +19,40 @@ if IS_SAGEMAKER_TRAINING:
     import subprocess
     print("Installing required packages for SageMaker training...")
 
-    # Install specific versions to avoid compatibility issues
+    # First, uninstall conflicting versions
+    print("Removing conflicting package versions...")
+    subprocess.run([sys.executable, '-m', 'pip', 'uninstall', '-y', 'tokenizers', 'transformers', 'accelerate'],
+                   capture_output=True)
+
+    # Install specific compatible versions in correct order
     print("Installing compatible package versions...")
+
+    # Install tokenizers first with correct version
+    subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'tokenizers==0.15.0'])
+
+    # Then install transformers and other packages
     packages = [
-        'transformers==4.36.2',  # Specific version to avoid LRScheduler issues
+        'transformers==4.36.2',  # Compatible with tokenizers 0.15
         'accelerate==0.25.0',    # Compatible with transformers 4.36
         'datasets>=2.14.0',
         'peft>=0.6.0',
         'sentencepiece>=0.1.99',
-        'protobuf>=3.20.0,<5.0.0'
+        'protobuf>=3.20.0,<5.0.0',
+        'safetensors>=0.3.1',
+        'huggingface-hub>=0.16.4',
+        'filelock',
+        'fsspec',
+        'packaging',
+        'pyyaml',
+        'regex',
+        'requests',
+        'tqdm',
+        'numpy'
     ]
 
     for package in packages:
         print(f"Installing {package}...")
-        subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--no-deps', package])
-
-    # Install dependencies
-    subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'safetensors', 'huggingface-hub', 'filelock', 'fsspec', 'packaging', 'pyyaml', 'regex', 'requests', 'tokenizers', 'tqdm', 'numpy'])
+        subprocess.check_call([sys.executable, '-m', 'pip', 'install', package])
 
 import torch
 import numpy as np
