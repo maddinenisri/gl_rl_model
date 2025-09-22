@@ -185,27 +185,27 @@ class GLRLTrainer:
             {
                 "query": "Show me all customers",
                 "sql": "SELECT * FROM customers;",
-                "context": "customers(id, name, email, created_at)"
+                "reasoning": "Selecting all records from customers table"
             },
             {
                 "query": "Get total sales by month",
                 "sql": "SELECT DATE_FORMAT(date, '%Y-%m') as month, SUM(amount) as total FROM sales GROUP BY month;",
-                "context": "sales(id, date, amount, product_id)"
+                "reasoning": "Grouping sales by month and calculating sum of amounts"
             },
             {
                 "query": "Find top 5 products by revenue",
                 "sql": "SELECT p.name, SUM(s.amount) as revenue FROM products p JOIN sales s ON p.id = s.product_id GROUP BY p.id ORDER BY revenue DESC LIMIT 5;",
-                "context": "products(id, name, price), sales(id, product_id, amount)"
+                "reasoning": "Joining products and sales tables, grouping by product, ordering by revenue"
             },
             {
                 "query": "List users who registered today",
                 "sql": "SELECT * FROM users WHERE DATE(created_at) = CURDATE();",
-                "context": "users(id, name, email, created_at)"
+                "reasoning": "Filtering users table by today's date"
             },
             {
                 "query": "Calculate average order value",
                 "sql": "SELECT AVG(total_amount) as avg_order_value FROM orders;",
-                "context": "orders(id, customer_id, total_amount, order_date)"
+                "reasoning": "Computing average of total_amount from orders table"
             }
         ]
 
@@ -254,10 +254,17 @@ class GLRLTrainer:
         prompts = []
         responses = []
 
-        for query, sql, context in zip(examples['query'], examples['sql'], examples['context']):
+        # Handle both 'context' and 'reasoning' fields
+        context_field = 'context' if 'context' in examples else 'reasoning'
+
+        for i in range(len(examples['query'])):
+            query = examples['query'][i]
+            sql = examples['sql'][i]
+            context = examples[context_field][i] if context_field in examples else ""
+
             prompt = f"""<|im_start|>system
 You are a SQL expert. Generate SQL queries based on natural language questions.
-Schema: {context}<|im_end|>
+Context: {context}<|im_end|>
 <|im_start|>user
 {query}<|im_end|>
 <|im_start|>assistant"""
