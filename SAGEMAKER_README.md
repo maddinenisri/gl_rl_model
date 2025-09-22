@@ -1,31 +1,32 @@
 # 🚀 GL RL Model - SageMaker Quick Start
 
-## Recommended Setup Method (Works Best!)
+## ✅ WORKING Setup Method (Tested & Confirmed)
 
 After opening your SageMaker notebook instance:
 
-### Option 1: Use the Setup Notebook (RECOMMENDED)
+### Option 1: Use the Complete Setup Notebook (RECOMMENDED)
 1. Navigate to `/home/ec2-user/SageMaker/gl_rl_model/`
-2. Open `SageMaker_Setup.ipynb`
+2. Open `SageMaker_Complete_Setup.ipynb`
 3. Run all cells to install dependencies
-4. This uses SageMaker best practices with `%pip` magic commands
+4. This uses conda for compiled packages and pip for the rest
 
-### Option 2: Run the Proper Setup Script
+### Option 2: Run the Final Working Setup Script
 ```bash
-cd /home/ec2-user/SageMaker/gl_rl_model && bash sagemaker_setup_proper.sh
+cd /home/ec2-user/SageMaker/gl_rl_model && bash sagemaker_setup_final.sh
 ```
 
-### Alternative Options (if above fail):
-
-**Simple Setup:**
-```bash
-cd /home/ec2-user/SageMaker/gl_rl_model && bash sagemaker_setup_simple.sh
+### Key Installation Commands (if doing manually):
+```python
+# In a notebook cell:
+%conda install -c conda-forge sentencepiece pyarrow -y
+%pip install transformers datasets peft trl accelerate torch huggingface-hub
+%pip install --upgrade multiprocess>=0.70.18
 ```
 
-**Conda Setup:**
-```bash
-cd /home/ec2-user/SageMaker/gl_rl_model && bash sagemaker_setup_conda.sh
-```
+### Why this works:
+- **conda-forge** provides precompiled binaries (no CMake needed)
+- **pip** installs pure Python packages
+- Avoids all compilation issues on SageMaker
 
 The script will:
 - ✅ Install all dependencies (using conda to avoid build issues)
