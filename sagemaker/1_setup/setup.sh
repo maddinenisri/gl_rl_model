@@ -10,6 +10,11 @@
 
 set -e
 
+# Check available memory
+echo "Checking system resources..."
+free -h
+echo ""
+
 echo "========================================="
 echo "🚀 GL RL Model - SageMaker Setup"
 echo "========================================="
@@ -50,9 +55,12 @@ echo ""
 echo "📦 Installing dependencies..."
 echo ""
 
-# Step 1: Install compiled packages with conda (specific versions to avoid conflicts)
+# Step 1: Install compiled packages with conda (one at a time to avoid memory issues)
 echo "Step 1/4: Installing compiled packages with conda..."
-conda install -c conda-forge sentencepiece pyarrow=15.0.0 -y -q
+echo "  Installing sentencepiece..."
+conda install -c conda-forge sentencepiece -y -q || pip install sentencepiece
+echo "  Installing pyarrow (this may take a moment)..."
+conda install -c conda-forge pyarrow=15.0.0 -y -q || pip install pyarrow==15.0.0
 
 # Step 2: Install PyTorch
 echo ""
@@ -110,12 +118,13 @@ echo "========================================="
 echo "✅ Setup Complete!"
 echo "========================================="
 echo ""
+echo "If conda install was killed (memory issue), try pip-only install:"
+echo "  pip install sentencepiece pyarrow==15.0.0"
+echo "  pip install torch transformers datasets peft trl accelerate"
+echo ""
 echo "Next steps:"
 echo "1. Open sagemaker/1_setup/Setup_Environment.ipynb to verify"
 echo "2. Open sagemaker/2_training/GPU_Training.ipynb for training"
 echo "3. Open sagemaker/3_inference/CPU_Inference.ipynb for inference"
-echo ""
-echo "To run this setup from a notebook, use:"
-echo "  !bash sagemaker/1_setup/setup.sh"
 echo ""
 echo "========================================="
