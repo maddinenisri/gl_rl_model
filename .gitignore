@@ -66,7 +66,11 @@ coverage.xml
 
 # Jupyter Notebooks
 .ipynb_checkpoints/
-*.ipynb
+# Allow setup notebooks
+!SageMaker_Setup.ipynb
+!GL_RL_Model_Quick_Start.ipynb
+!gl_rl_model_sagemaker.ipynb
+!gl_rl_model_colab.ipynb
 
 # IDE and Editors
 .idea/

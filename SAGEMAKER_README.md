@@ -1,22 +1,30 @@
 # 🚀 GL RL Model - SageMaker Quick Start
 
-## One-Command Setup
+## Recommended Setup Method (Works Best!)
 
-After opening your SageMaker notebook instance, run ONE of these commands:
+After opening your SageMaker notebook instance:
 
-### Option 1: Simple Setup (Recommended - Works on t2.medium)
+### Option 1: Use the Setup Notebook (RECOMMENDED)
+1. Navigate to `/home/ec2-user/SageMaker/gl_rl_model/`
+2. Open `SageMaker_Setup.ipynb`
+3. Run all cells to install dependencies
+4. This uses SageMaker best practices with `%pip` magic commands
+
+### Option 2: Run the Proper Setup Script
+```bash
+cd /home/ec2-user/SageMaker/gl_rl_model && bash sagemaker_setup_proper.sh
+```
+
+### Alternative Options (if above fail):
+
+**Simple Setup:**
 ```bash
 cd /home/ec2-user/SageMaker/gl_rl_model && bash sagemaker_setup_simple.sh
 ```
 
-### Option 2: Conda Setup (If conda packages needed)
+**Conda Setup:**
 ```bash
 cd /home/ec2-user/SageMaker/gl_rl_model && bash sagemaker_setup_conda.sh
-```
-
-### Option 3: Standard Setup (Full featured)
-```bash
-cd /home/ec2-user/SageMaker/gl_rl_model && bash sagemaker_setup.sh
 ```
 
 The script will:
