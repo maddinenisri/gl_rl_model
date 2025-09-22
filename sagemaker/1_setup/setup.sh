@@ -3,154 +3,270 @@
 # =============================================================================
 # GL RL Model - SageMaker Setup Script
 # =============================================================================
-# Single, consolidated setup script that works on SageMaker instances
-# Uses conda for compiled packages and pip for Python packages
-# Tested on ml.t2.medium instances
+# Clean, modular setup script for SageMaker environments
+# Handles dependency conflicts and ensures proper installation order
 # =============================================================================
 
 set -e
 
-# Check available memory and warn if too low
-echo "Checking system resources..."
-free -h
-TOTAL_MEM=$(free -m | awk 'NR==2{print $2}')
-if [ "$TOTAL_MEM" -lt 8000 ]; then
-    echo ""
-    echo "⚠️ WARNING: System has less than 8GB RAM (${TOTAL_MEM}MB)"
-    echo "   ml.t2.medium (4GB) is too small for conda installations"
-    echo "   Consider upgrading to ml.t3.xlarge (16GB) or higher"
-    echo "   Or use pip-only installation (see instructions below)"
-    echo ""
-fi
+# ============= Configuration =============
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+REQUIREMENTS_FILE="$SCRIPT_DIR/requirements-sagemaker.txt"
+VERIFY_SCRIPT="$SCRIPT_DIR/verify_setup.py"
+LOG_FILE="/tmp/sagemaker_setup_$(date +%Y%m%d_%H%M%S).log"
 
-echo "========================================="
-echo "🚀 GL RL Model - SageMaker Setup"
-echo "========================================="
-echo ""
+# Color codes for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
 
-# Check if we're in SageMaker
-if [ ! -d "/home/ec2-user/SageMaker" ]; then
-    echo "❌ Error: This script should be run in a SageMaker notebook instance"
-    echo "Please run this from the SageMaker Jupyter terminal"
-    exit 1
-fi
+# ============= Helper Functions =============
 
-# Navigate to SageMaker directory
-cd /home/ec2-user/SageMaker
+log() {
+    echo -e "[$(date +'%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
+}
 
-echo "📁 Working directory: $(pwd)"
-echo ""
+log_success() {
+    echo -e "${GREEN}✅ $1${NC}" | tee -a "$LOG_FILE"
+}
 
-# Clone or update repository
-if [ -d "gl_rl_model" ]; then
-    echo "✅ Repository already exists"
-    cd gl_rl_model
-    echo "📥 Pulling latest changes..."
-    git pull origin main || true
-else
-    echo "📥 Cloning repository..."
-    git clone https://github.com/maddinenisri/gl_rl_model.git
-    cd gl_rl_model
-fi
+log_warning() {
+    echo -e "${YELLOW}⚠️  $1${NC}" | tee -a "$LOG_FILE"
+}
 
-echo ""
-echo "🔧 Fixing GLIBCXX issue first..."
-# Update conda itself first
-echo "  Updating conda..."
-conda update -n base -c defaults conda -y -q
-# Force update libstdc++ to get GLIBCXX_3.4.29
-echo "  Installing gcc_linux-64..."
-conda install -c conda-forge gcc_linux-64 -y -q
-echo "  Installing libstdcxx-ng..."
-conda install -c conda-forge libstdcxx-ng -y -q
-# Export library path to use the updated libstdc++
-export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
+log_error() {
+    echo -e "${RED}❌ $1${NC}" | tee -a "$LOG_FILE"
+}
 
-echo ""
-echo "📦 Installing dependencies..."
-echo ""
+check_sagemaker_environment() {
+    log "Checking environment..."
 
-# Step 1: Install compiled packages with conda (avoids build issues)
-echo "Step 1/4: Installing compiled packages with conda..."
-echo "  Installing sentencepiece..."
-conda install -c conda-forge sentencepiece -y -q || pip install sentencepiece
-echo "  Installing pyarrow (using conda to avoid build issues)..."
-# Use latest pyarrow that datasets needs (>=21.0.0)
-conda install -c conda-forge 'pyarrow>=21.0.0' -y -q || echo "⚠️ PyArrow conda install failed"
+    if [ ! -d "/home/ec2-user/SageMaker" ]; then
+        log_error "This script should be run in a SageMaker notebook instance"
+        log "Current directory: $(pwd)"
+        exit 1
+    fi
 
-# Step 2: Install PyTorch
-echo ""
-echo "Step 2/4: Installing PyTorch..."
-pip install -q torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+    # Check available memory
+    TOTAL_MEM=$(free -m | awk 'NR==2{print $2}')
+    log "Available memory: ${TOTAL_MEM}MB"
 
-# Step 3: Install ML libraries with compatible versions
-echo ""
-echo "Step 3/4: Installing ML libraries..."
-# Use specific dataset version that works with fsspec 2024.6.1
-pip install -q transformers 'datasets==2.21.0' peft trl accelerate huggingface-hub tokenizers
+    if [ "$TOTAL_MEM" -lt 8000 ]; then
+        log_warning "System has less than 8GB RAM. Consider using ml.t3.xlarge or larger."
+        log_warning "Installation may fail on ml.t2.medium instances."
+    fi
 
-# Step 4: Fix version conflicts - install compatible versions
-echo ""
-echo "Step 4/4: Fixing version conflicts..."
-# Fix all known conflicts
-pip install -q --force-reinstall \
-    'fsspec==2024.6.1' \
-    's3fs==2024.6.1' \
-    'dill==0.3.8' \
-    'multiprocess==0.70.16' \
-    'numpy==1.26.4' \
-    'protobuf==6.31.0' \
-    'botocore>=1.39.9,<1.39.12' \
-    'aiobotocore>=2.13.0' \
-    pandas tqdm aiohttp
+    # Display system info
+    log "Python version: $(python --version 2>&1)"
+    log "Conda version: $(conda --version 2>&1)"
+    log "Working directory: $(pwd)"
+}
 
-# Expected warnings:
-# - pathos wants multiprocess>=0.70.18 (we use 0.70.16 for datasets)
-# - These are non-critical and the packages will still work
+navigate_to_repo() {
+    cd /home/ec2-user/SageMaker
 
-echo ""
-echo "📥 Setting up training data..."
-mkdir -p data/training
+    if [ -d "gl_rl_model" ]; then
+        log_success "Repository exists, updating..."
+        cd gl_rl_model
+        git pull origin main 2>&1 | tee -a "$LOG_FILE" || log_warning "Could not pull latest changes"
+    else
+        log "Cloning repository..."
+        git clone https://github.com/maddinenisri/gl_rl_model.git 2>&1 | tee -a "$LOG_FILE"
+        cd gl_rl_model
+    fi
 
-# Create sample training data
-if [ ! -f "data/training/query_pairs.jsonl" ]; then
-    cat > data/training/query_pairs.jsonl << 'EOF'
+    log_success "Repository ready at: $(pwd)"
+}
+
+cleanup_conflicting_packages() {
+    log "Cleaning conflicting packages..."
+
+    # Uninstall packages that cause conflicts
+    local packages_to_remove=(
+        "dill"
+        "multiprocess"
+        "fsspec"
+        "s3fs"
+        "botocore"
+        "boto3"
+        "aiobotocore"
+    )
+
+    for package in "${packages_to_remove[@]}"; do
+        pip uninstall -y "$package" 2>/dev/null || true
+    done
+
+    # Clear pip cache
+    pip cache purge 2>/dev/null || true
+
+    log_success "Cleanup completed"
+}
+
+fix_system_libraries() {
+    log "Fixing system libraries (GLIBCXX issue)..."
+
+    # Update conda to ensure we have the latest resolver
+    conda update -n base -c defaults conda -y -q 2>&1 | tee -a "$LOG_FILE"
+
+    # Install/update gcc and libstdc++ for GLIBCXX support
+    conda install -c conda-forge gcc_linux-64 libstdcxx-ng -y -q 2>&1 | tee -a "$LOG_FILE"
+
+    # Export library path
+    export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
+
+    log_success "System libraries updated"
+}
+
+install_conda_packages() {
+    log "Installing compiled packages with conda..."
+
+    # These packages are better installed via conda to avoid compilation issues
+    local conda_packages=(
+        "sentencepiece"
+        "pyarrow>=21.0.0"
+    )
+
+    for package in "${conda_packages[@]}"; do
+        log "Installing $package..."
+        conda install -c conda-forge "$package" -y -q 2>&1 | tee -a "$LOG_FILE" || {
+            log_warning "Conda install failed for $package, will try pip"
+        }
+    done
+
+    log_success "Conda packages installed"
+}
+
+install_requirements() {
+    log "Installing Python packages from requirements..."
+
+    if [ ! -f "$REQUIREMENTS_FILE" ]; then
+        log_error "Requirements file not found: $REQUIREMENTS_FILE"
+        return 1
+    fi
+
+    # Install packages in groups to handle dependencies properly
+    log "Installing AWS dependencies..."
+    grep -E "^(botocore|boto3|aiobotocore)" "$REQUIREMENTS_FILE" | xargs -r pip install --no-cache-dir 2>&1 | tee -a "$LOG_FILE"
+
+    log "Installing filesystem dependencies..."
+    grep -E "^(fsspec|s3fs)" "$REQUIREMENTS_FILE" | xargs -r pip install --no-cache-dir 2>&1 | tee -a "$LOG_FILE"
+
+    log "Installing multiprocessing dependencies..."
+    grep -E "^(dill|multiprocess)" "$REQUIREMENTS_FILE" | xargs -r pip install --no-cache-dir 2>&1 | tee -a "$LOG_FILE"
+
+    log "Installing ML core dependencies..."
+    pip install --no-cache-dir torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu 2>&1 | tee -a "$LOG_FILE"
+    pip install --no-cache-dir transformers==4.56.2 datasets==2.21.0 2>&1 | tee -a "$LOG_FILE"
+
+    log "Installing remaining dependencies..."
+    pip install --no-cache-dir -r "$REQUIREMENTS_FILE" 2>&1 | tee -a "$LOG_FILE" || {
+        log_warning "Some packages may have failed. Continuing..."
+    }
+
+    log_success "Package installation completed"
+}
+
+setup_training_data() {
+    log "Setting up training data..."
+
+    mkdir -p data/training
+
+    if [ ! -f "data/training/query_pairs.jsonl" ]; then
+        cat > data/training/query_pairs.jsonl << 'EOF'
 {"query": "Show me all customers", "sql": "SELECT * FROM customers;", "context": "customers(id, name, email, created_at)"}
 {"query": "Get total sales by month", "sql": "SELECT DATE_FORMAT(date, '%Y-%m') as month, SUM(amount) as total FROM sales GROUP BY month;", "context": "sales(id, date, amount, product_id)"}
 {"query": "Find top 5 products by revenue", "sql": "SELECT p.name, SUM(s.amount) as revenue FROM products p JOIN sales s ON p.id = s.product_id GROUP BY p.id ORDER BY revenue DESC LIMIT 5;", "context": "products(id, name, price), sales(id, product_id, amount)"}
 {"query": "List users who registered today", "sql": "SELECT * FROM users WHERE DATE(created_at) = CURDATE();", "context": "users(id, name, email, created_at)"}
 {"query": "Calculate average order value", "sql": "SELECT AVG(total_amount) as avg_order_value FROM orders;", "context": "orders(id, customer_id, total_amount, order_date)"}
 EOF
-    echo "✅ Created sample training data"
-else
-    echo "✅ Training data already exists"
-fi
+        log_success "Created sample training data"
+    else
+        log_success "Training data already exists"
+    fi
+}
 
-# Quick test
-echo ""
-echo "🧪 Testing installation..."
-python -c "
-import torch, transformers, datasets, sentencepiece, pyarrow
-print('✅ PyTorch:', torch.__version__)
-print('✅ Transformers:', transformers.__version__)
-print('✅ Datasets:', datasets.__version__)
-print('✅ All core packages installed successfully!')
-print('')
-print('Device:', 'CUDA' if torch.cuda.is_available() else 'CPU (use Training Jobs for GPU)')
-" || echo "⚠️ Some packages may need manual installation"
+verify_installation() {
+    log "Verifying installation..."
 
-echo ""
-echo "========================================="
-echo "✅ Setup Complete!"
-echo "========================================="
-echo ""
-echo "If conda install was killed (memory issue), try pip-only install:"
-echo "  pip install sentencepiece pyarrow==15.0.0"
-echo "  pip install torch transformers datasets peft trl accelerate"
-echo ""
-echo "Next steps:"
-echo "1. Open sagemaker/1_setup/Setup_Environment.ipynb to verify"
-echo "2. Open sagemaker/2_training/GPU_Training.ipynb for training"
-echo "3. Open sagemaker/3_inference/CPU_Inference.ipynb for inference"
-echo ""
-echo "========================================="
+    if [ -f "$VERIFY_SCRIPT" ]; then
+        python "$VERIFY_SCRIPT" 2>&1 | tee -a "$LOG_FILE" || {
+            log_error "Verification failed. Check $LOG_FILE for details."
+            return 1
+        }
+    else
+        # Basic verification if script doesn't exist
+        python -c "
+import sys
+try:
+    import torch
+    import transformers
+    import datasets
+    print('✅ PyTorch:', torch.__version__)
+    print('✅ Transformers:', transformers.__version__)
+    print('✅ Datasets:', datasets.__version__)
+    print('✅ Device:', 'CUDA' if torch.cuda.is_available() else 'CPU')
+    sys.exit(0)
+except ImportError as e:
+    print('❌ Import error:', e)
+    sys.exit(1)
+" 2>&1 | tee -a "$LOG_FILE" || {
+            log_error "Basic verification failed"
+            return 1
+        }
+    fi
+
+    log_success "Installation verified successfully"
+}
+
+display_next_steps() {
+    echo ""
+    echo "========================================="
+    echo -e "${GREEN}✅ Setup Complete!${NC}"
+    echo "========================================="
+    echo ""
+    echo "Log file saved to: $LOG_FILE"
+    echo ""
+    echo "Next steps:"
+    echo "1. Open sagemaker/1_setup/Setup_Environment.ipynb to verify"
+    echo "2. Open sagemaker/2_training/GPU_Training.ipynb for training"
+    echo "3. Open sagemaker/3_inference/CPU_Inference.ipynb for inference"
+    echo ""
+    echo "If you encounter issues:"
+    echo "- Check the log file: $LOG_FILE"
+    echo "- Try manual installation: pip install -r $REQUIREMENTS_FILE"
+    echo "- For ml.t2.medium instances, use pip instead of conda"
+    echo ""
+    echo "========================================="
+}
+
+rollback_on_error() {
+    log_error "Setup failed. Rolling back changes..."
+    log "Check log file for details: $LOG_FILE"
+    exit 1
+}
+
+# ============= Main Execution =============
+
+main() {
+    trap rollback_on_error ERR
+
+    echo "========================================="
+    echo "🚀 GL RL Model - SageMaker Setup"
+    echo "========================================="
+    echo ""
+
+    check_sagemaker_environment
+    navigate_to_repo
+    cleanup_conflicting_packages
+    fix_system_libraries
+    install_conda_packages
+    install_requirements
+    setup_training_data
+    verify_installation
+    display_next_steps
+}
+
+# Run the main function
+main "$@"

@@ -1,0 +1,69 @@
+# =============================================================================
+# GL RL Model - SageMaker Requirements
+# =============================================================================
+# Pinned versions that work together without conflicts
+# Install groups in order: AWS, Filesystem, Multiprocessing, ML Core, Extensions
+# =============================================================================
+
+# ============= AWS Dependencies (Group 1 - Install First) =============
+botocore==1.40.21
+boto3==1.40.21
+aiobotocore>=2.13.0
+
+# ============= File System (Group 2) =============
+fsspec==2025.7.0
+s3fs==2025.7.0
+
+# ============= Multiprocessing (Group 3) =============
+dill>=0.4.0
+multiprocess>=0.70.18
+
+# ============= ML Core (Group 4) =============
+# Note: torch installed separately with CPU index URL
+# torch==2.6.0  # Install via: pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu
+transformers==4.56.2
+datasets==2.21.0
+tokenizers>=0.21.2
+sentencepiece>=0.2.0
+
+# ============= ML Extensions (Group 5) =============
+peft>=0.6.0
+trl>=0.7.0
+accelerate>=0.24.0
+bitsandbytes>=0.41.0
+huggingface-hub>=0.17.0
+
+# ============= Data Processing (Group 6) =============
+pandas>=2.0.0
+numpy>=1.24.0,<2.0.0
+pyarrow>=21.0.0
+sqlparse>=0.4.4
+scikit-learn>=1.3.0
+
+# ============= Utilities (Group 7) =============
+tqdm>=4.65.0
+aiohttp>=3.8.0
+protobuf>=3.20.0,<5.0.0
+sympy>=1.14.0
+
+# ============= API/Server (Group 8 - Optional) =============
+# Uncomment if you need API functionality
+# fastapi>=0.104.0
+# uvicorn>=0.24.0
+
+# =============================================================================
+# Installation Notes:
+# =============================================================================
+# 1. Clean existing packages first:
+#    pip uninstall -y dill multiprocess fsspec s3fs botocore boto3
+#
+# 2. Install PyTorch separately:
+#    pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu
+#
+# 3. Then install this file:
+#    pip install -r requirements-sagemaker.txt
+#
+# 4. Known warnings (non-critical):
+#    - pathos may complain about multiprocess version
+#    - These warnings can be safely ignored
+# =============================================================================

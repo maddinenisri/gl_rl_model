@@ -107,6 +107,104 @@ The infrastructure is managed by Terraform in `/terraform`:
 - **Method**: LoRA fine-tuning (r=8, alpha=16)
 - **Training**: 3 epochs on query-SQL pairs
 
+## 🔧 Troubleshooting Common Issues
+
+### Dependency Conflicts
+
+If you encounter dependency conflicts during setup:
+
+1. **Clean Installation**:
+   ```bash
+   # Remove conflicting packages
+   pip uninstall -y dill multiprocess fsspec s3fs botocore boto3
+   pip cache purge
+
+   # Reinstall with fixed versions
+   pip install -r sagemaker/1_setup/requirements-sagemaker.txt
+   ```
+
+2. **Verify Installation**:
+   ```bash
+   python sagemaker/1_setup/verify_setup.py
+   ```
+
+### Common Error Solutions
+
+| Error | Solution |
+|-------|----------|
+| `ImportError: libstdc++.so.6: version GLIBCXX_3.4.29 not found` | Run: `conda install -c conda-forge gcc_linux-64 libstdcxx-ng` |
+| `botocore version conflict` | Install specific versions: `pip install botocore==1.40.21 boto3==1.40.21` |
+| `fsspec/s3fs incompatibility` | Install matching versions: `pip install fsspec==2025.7.0 s3fs==2025.7.0` |
+| `multiprocess version error` | Update: `pip install 'dill>=0.4.0' 'multiprocess>=0.70.18'` |
+| `Out of memory during conda install` | Use pip instead: `pip install sentencepiece pyarrow` |
+
+### Memory Issues on ml.t2.medium
+
+For ml.t2.medium instances (4GB RAM):
+
+1. **Skip conda installations**:
+   ```bash
+   # Use pip for everything
+   pip install sentencepiece pyarrow
+   pip install -r sagemaker/1_setup/requirements-sagemaker.txt
+   ```
+
+2. **Clear memory before installation**:
+   ```bash
+   # Stop Jupyter kernel
+   pkill -f jupyter
+
+   # Clear pip cache
+   pip cache purge
+
+   # Run setup
+   bash sagemaker/1_setup/setup.sh
+   ```
+
+### AWS Connectivity Issues
+
+If S3 access fails:
+
+1. **Check IAM role**:
+   - Ensure SageMaker execution role has S3 access
+   - Add `AmazonS3FullAccess` policy if needed
+
+2. **Verify credentials**:
+   ```python
+   import boto3
+   s3 = boto3.client('s3')
+   s3.list_buckets()  # Should list your buckets
+   ```
+
+### Clean Reinstallation
+
+For a complete fresh start:
+
+```bash
+# Navigate to SageMaker directory
+cd /home/ec2-user/SageMaker
+
+# Remove existing repo
+rm -rf gl_rl_model
+
+# Clone fresh
+git clone https://github.com/maddinenisri/gl_rl_model.git
+cd gl_rl_model
+
+# Run new setup
+bash sagemaker/1_setup/setup.sh
+```
+
+### Logs and Debugging
+
+Setup logs are saved to `/tmp/sagemaker_setup_[timestamp].log`
+
+To view the latest log:
+```bash
+ls -lt /tmp/sagemaker_setup_*.log | head -1
+tail -f /tmp/sagemaker_setup_*.log  # Follow log in real-time
+```
+
 ---
 
 **Remember**: Always stop your SageMaker notebook instance when not in use to avoid charges!
