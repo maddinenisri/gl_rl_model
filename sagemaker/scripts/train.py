@@ -19,28 +19,53 @@ if IS_SAGEMAKER_TRAINING:
     import subprocess
     print("Installing required packages for SageMaker training...")
 
-    # First, upgrade transformers to fix compatibility issues
-    print("Upgrading transformers for compatibility...")
-    subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--upgrade', 'transformers>=4.36.0'])
+    # Install specific versions to avoid compatibility issues
+    print("Installing compatible package versions...")
+    packages = [
+        'transformers==4.36.2',  # Specific version to avoid LRScheduler issues
+        'accelerate==0.25.0',    # Compatible with transformers 4.36
+        'datasets>=2.14.0',
+        'peft>=0.6.0',
+        'sentencepiece>=0.1.99',
+        'protobuf>=3.20.0,<5.0.0'
+    ]
 
-    requirements_file = Path(__file__).parent.parent / 'requirements' / 'sagemaker-training.txt'
-    if requirements_file.exists():
-        subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-r', str(requirements_file)])
-    else:
-        # Fallback to essential packages
-        packages = ['datasets>=2.14.0', 'peft>=0.6.0', 'accelerate>=0.24.0', 'sentencepiece>=0.1.99']
-        for package in packages:
-            subprocess.check_call([sys.executable, '-m', 'pip', 'install', package])
+    for package in packages:
+        print(f"Installing {package}...")
+        subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--no-deps', package])
+
+    # Install dependencies
+    subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'safetensors', 'huggingface-hub', 'filelock', 'fsspec', 'packaging', 'pyyaml', 'regex', 'requests', 'tokenizers', 'tqdm', 'numpy'])
 
 import torch
 import numpy as np
-from transformers import (
-    AutoModelForCausalLM,
-    AutoTokenizer,
-    TrainingArguments,
-    Trainer,
-    DataCollatorForSeq2Seq
-)
+
+# Try to import with fallback for LRScheduler issue
+try:
+    from transformers import (
+        AutoModelForCausalLM,
+        AutoTokenizer,
+        TrainingArguments,
+        Trainer,
+        DataCollatorForSeq2Seq
+    )
+except ImportError as e:
+    if "LRScheduler" in str(e):
+        print("Working around LRScheduler import issue...")
+        # Temporary workaround for LRScheduler issue
+        import transformers.optimization
+        if not hasattr(transformers.optimization, 'LRScheduler'):
+            from torch.optim.lr_scheduler import LambdaLR as LRScheduler
+            transformers.optimization.LRScheduler = LRScheduler
+    # Retry import
+    from transformers import (
+        AutoModelForCausalLM,
+        AutoTokenizer,
+        TrainingArguments,
+        Trainer,
+        DataCollatorForSeq2Seq
+    )
+
 from datasets import load_dataset
 from peft import LoraConfig, get_peft_model, TaskType
 
