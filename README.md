@@ -21,6 +21,13 @@ This project implements a complete pipeline for training and deploying an AI mod
 
 ```
 gl_rl_model/
+├── sagemaker/              # 🚀 Amazon SageMaker deployment
+│   ├── 1_setup/           # Environment setup
+│   ├── 2_training/        # GPU training guides
+│   ├── 3_inference/       # CPU inference
+│   └── README.md          # SageMaker guide
+├── colab/                  # Google Colab notebooks
+├── terraform/              # AWS infrastructure as code
 ├── gl_rl_model/
 │   ├── agents/             # Multi-agent system components
 │   │   ├── orchestrator.py
@@ -55,6 +62,19 @@ gl_rl_model/
 ```
 
 ## 🚀 Quick Start
+
+### For Amazon SageMaker Users
+
+See the `sagemaker/` directory for complete deployment:
+- **Setup**: `sagemaker/1_setup/` - One-command environment setup
+- **Training**: `sagemaker/2_training/` - GPU training with spot instances (70% cost savings)
+- **Inference**: `sagemaker/3_inference/` - CPU inference and batch processing
+
+```bash
+# Quick setup on SageMaker
+cd /home/ec2-user/SageMaker/gl_rl_model
+bash sagemaker/1_setup/setup.sh
+```
 
 ### Prerequisites
 
