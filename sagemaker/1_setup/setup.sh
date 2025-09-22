@@ -55,31 +55,35 @@ echo ""
 echo "📦 Installing dependencies..."
 echo ""
 
-# Step 1: Install compiled packages with conda (one at a time to avoid memory issues)
-echo "Step 1/4: Installing compiled packages with conda..."
-echo "  Installing sentencepiece..."
+# Step 1: Install sentencepiece with conda (pyarrow will be handled by pip)
+echo "Step 1/4: Installing sentencepiece..."
 conda install -c conda-forge sentencepiece -y -q || pip install sentencepiece
-echo "  Installing pyarrow (this may take a moment)..."
-conda install -c conda-forge pyarrow=15.0.0 -y -q || pip install pyarrow==15.0.0
 
 # Step 2: Install PyTorch
 echo ""
 echo "Step 2/4: Installing PyTorch..."
 pip install -q torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 
-# Step 3: Install ML libraries
+# Step 3: Install ML libraries with compatible versions
 echo ""
 echo "Step 3/4: Installing ML libraries..."
-pip install -q transformers 'datasets>=2.14.0,<3.0.0' peft trl accelerate huggingface-hub tokenizers
+# Use specific dataset version that works with fsspec 2024.6.1
+pip install -q transformers 'datasets==2.21.0' peft trl accelerate huggingface-hub tokenizers
 
-# Step 4: Fix version conflicts for SageMaker compatibility
+# Step 4: Fix version conflicts - install in correct order
 echo ""
 echo "Step 4/4: Fixing version conflicts..."
+# First install the versions that datasets needs
+pip install -q --force-reinstall \
+    'fsspec==2024.6.1' \
+    'pyarrow>=21.0.0' \
+    'dill>=0.3.8' \
+    'multiprocess==0.70.16'
+
+# Then install SageMaker-compatible versions
 pip install -q \
-    'multiprocess==0.70.16' \
-    'fsspec==2025.7.0' \
     'numpy==1.26.4' \
-    'protobuf>=3.12,<6.32' \
+    'protobuf==6.31.0' \
     pandas tqdm aiohttp
 
 echo ""
