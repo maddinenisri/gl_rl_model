@@ -27,14 +27,16 @@ if IS_SAGEMAKER_TRAINING:
     # Install specific compatible versions in correct order
     print("Installing compatible package versions...")
 
-    # Install tokenizers first with a version compatible with transformers
-    subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'tokenizers==0.15.2'])
-    print("✓ Installed tokenizers==0.15.2")
+    # Install specific versions that are known to work together
+    # Based on HuggingFace's compatibility matrix
+    subprocess.check_call([sys.executable, '-m', 'pip', 'install',
+                          'transformers==4.35.0',
+                          'tokenizers==0.14.1',
+                          'accelerate==0.24.1'])
+    print("✓ Installed transformers==4.35.0, tokenizers==0.14.1, accelerate==0.24.1")
 
-    # Then install transformers and other packages (all compatible versions)
+    # Then install other packages
     packages = [
-        'transformers==4.36.2',  # Compatible with tokenizers 0.15.x and accelerate 0.21.0
-        'accelerate==0.21.0',    # Compatible with transformers 4.36.2
         'datasets>=2.14.0',
         'peft>=0.6.0',
         'sentencepiece>=0.1.99',
