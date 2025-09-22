@@ -1,29 +1,33 @@
 # =============================================================================
 # GL RL Model - SageMaker Requirements
 # =============================================================================
-# Pinned versions that work together without conflicts
-# Install groups in order: AWS, Filesystem, Multiprocessing, ML Core, Extensions
+# Fixed versions that work together without conflicts
+# Based on the actual SageMaker environment constraints
 # =============================================================================
 
-# ============= AWS Dependencies (Group 1 - Install First) =============
-botocore==1.40.21
-boto3==1.40.21
-aiobotocore>=2.13.0
+# ============= AWS Dependencies (Group 1) =============
+# Note: aiobotocore requires specific botocore version
+# We'll use compatible versions that work with SageMaker
+botocore>=1.39.9,<1.40.19
+boto3>=1.39.5,<2.0
+aiobotocore>=2.13.0,<2.25.0
 
 # ============= File System (Group 2) =============
-fsspec==2025.7.0
-s3fs==2025.7.0
+# These must match what datasets expects
+fsspec[http]==2024.6.1
+s3fs==2024.6.1
 
 # ============= Multiprocessing (Group 3) =============
-dill>=0.4.0
-multiprocess>=0.70.18
+# datasets 2.21.0 requires specific versions
+dill>=0.3.0,<0.3.9
+multiprocess==0.70.16
 
 # ============= ML Core (Group 4) =============
-# Note: torch installed separately with CPU index URL
+# Already installed via setup.sh separately:
 # torch==2.6.0  # Install via: pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu
 transformers==4.56.2
 datasets==2.21.0
-tokenizers>=0.21.2
+tokenizers>=0.21.2,<=0.23.0
 sentencepiece>=0.2.0
 
 # ============= ML Extensions (Group 5) =============
@@ -46,24 +50,23 @@ aiohttp>=3.8.0
 protobuf>=3.20.0,<5.0.0
 sympy>=1.14.0
 
-# ============= API/Server (Group 8 - Optional) =============
-# Uncomment if you need API functionality
-# fastapi>=0.104.0
-# uvicorn>=0.24.0
-
 # =============================================================================
-# Installation Notes:
+# Installation Instructions for SageMaker:
 # =============================================================================
-# 1. Clean existing packages first:
-#    pip uninstall -y dill multiprocess fsspec s3fs botocore boto3
+# 1. First clean conflicting packages:
+#    pip uninstall -y dill multiprocess fsspec s3fs botocore boto3 aiobotocore
 #
-# 2. Install PyTorch separately:
+# 2. Install core dependencies in order:
+#    pip install fsspec==2024.6.1 s3fs==2024.6.1
+#    pip install 'dill>=0.3.0,<0.3.9' multiprocess==0.70.16
+#    pip install 'botocore>=1.39.9,<1.40.19' 'boto3>=1.39.5,<2.0'
+#
+# 3. Install PyTorch:
 #    pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu
 #
-# 3. Then install this file:
-#    pip install -r requirements-sagemaker.txt
+# 4. Install remaining packages:
+#    pip install transformers==4.56.2 datasets==2.21.0
+#    pip install -r requirements-sagemaker.txt --no-deps
 #
-# 4. Known warnings (non-critical):
-#    - pathos may complain about multiprocess version
-#    - These warnings can be safely ignored
+# Note: Use --no-deps flag to avoid pip trying to resolve all dependencies
 # =============================================================================

@@ -139,30 +139,49 @@ install_conda_packages() {
 }
 
 install_requirements() {
-    log "Installing Python packages from requirements..."
+    log "Installing Python packages with proper version resolution..."
 
     if [ ! -f "$REQUIREMENTS_FILE" ]; then
         log_error "Requirements file not found: $REQUIREMENTS_FILE"
         return 1
     fi
 
-    # Install packages in groups to handle dependencies properly
-    log "Installing AWS dependencies..."
-    grep -E "^(botocore|boto3|aiobotocore)" "$REQUIREMENTS_FILE" | xargs -r pip install --no-cache-dir 2>&1 | tee -a "$LOG_FILE"
+    # Install in specific order to avoid conflicts
 
+    # 1. Filesystem packages (must be exact versions for datasets)
     log "Installing filesystem dependencies..."
-    grep -E "^(fsspec|s3fs)" "$REQUIREMENTS_FILE" | xargs -r pip install --no-cache-dir 2>&1 | tee -a "$LOG_FILE"
+    pip install --no-cache-dir fsspec==2024.6.1 s3fs==2024.6.1 2>&1 | tee -a "$LOG_FILE"
 
+    # 2. Multiprocessing (specific versions for datasets 2.21.0)
     log "Installing multiprocessing dependencies..."
-    grep -E "^(dill|multiprocess)" "$REQUIREMENTS_FILE" | xargs -r pip install --no-cache-dir 2>&1 | tee -a "$LOG_FILE"
+    pip install --no-cache-dir 'dill>=0.3.0,<0.3.9' multiprocess==0.70.16 2>&1 | tee -a "$LOG_FILE"
 
-    log "Installing ML core dependencies..."
+    # 3. AWS dependencies (compatible with aiobotocore)
+    log "Installing AWS dependencies..."
+    pip install --no-cache-dir 'botocore>=1.39.9,<1.40.19' 2>&1 | tee -a "$LOG_FILE"
+    pip install --no-cache-dir 'boto3>=1.39.5,<2.0' 2>&1 | tee -a "$LOG_FILE"
+    # Skip aiobotocore as it auto-installs with s3fs
+
+    # 4. PyTorch (CPU version)
+    log "Installing PyTorch..."
     pip install --no-cache-dir torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu 2>&1 | tee -a "$LOG_FILE"
+
+    # 5. Core ML libraries
+    log "Installing ML core dependencies..."
     pip install --no-cache-dir transformers==4.56.2 datasets==2.21.0 2>&1 | tee -a "$LOG_FILE"
 
+    # 6. Additional ML libraries
+    log "Installing ML extensions..."
+    pip install --no-cache-dir peft trl accelerate huggingface-hub 2>&1 | tee -a "$LOG_FILE"
+
+    # 7. Data processing and utilities
+    log "Installing data processing libraries..."
+    pip install --no-cache-dir pandas numpy pyarrow sqlparse scikit-learn 2>&1 | tee -a "$LOG_FILE"
+
+    # 8. Remaining dependencies (ignore conflicts)
     log "Installing remaining dependencies..."
-    pip install --no-cache-dir -r "$REQUIREMENTS_FILE" 2>&1 | tee -a "$LOG_FILE" || {
-        log_warning "Some packages may have failed. Continuing..."
+    pip install --no-cache-dir bitsandbytes sympy protobuf 2>&1 | tee -a "$LOG_FILE" || {
+        log_warning "Some optional packages may have warnings. This is expected."
     }
 
     log_success "Package installation completed"
