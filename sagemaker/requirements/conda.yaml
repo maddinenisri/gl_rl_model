@@ -1,0 +1,18 @@
+name: gl_rl_model
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  # System libraries (MUST be conda for GLIBCXX support)
+  - python=3.10
+  - gcc_linux-64
+  - libstdcxx-ng
+
+  # Compiled packages (better performance via conda)
+  - sentencepiece
+  - pyarrow>=21.0.0
+
+  # Package manager
+  - pip
+  - pip:
+    - -r pip-requirements.txt

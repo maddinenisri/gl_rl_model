@@ -1,210 +1,196 @@
 # 🚀 GL RL Model - SageMaker Guide
 
-Complete guide for running the GL RL Model on Amazon SageMaker.
+Complete guide for training and deploying the GL RL Model on Amazon SageMaker.
 
 ## 📁 Directory Structure
 
 ```
 sagemaker/
-├── 1_setup/                    # Environment setup
-│   ├── setup.sh                # One-command setup script
-│   └── Setup_Environment.ipynb # Setup notebook
-├── 2_training/                 # GPU training
-│   ├── GPU_Training.ipynb      # Training guide
-│   └── train.py                # Training script
-└── 3_inference/                # CPU inference
-    └── CPU_Inference.ipynb      # Inference guide
+├── README.md                       # This file
+├── requirements/                   # Dependency management
+│   ├── conda.yaml                  # Conda environment specification
+│   ├── pip-requirements.txt        # Python package requirements
+│   └── sagemaker-training.txt      # Runtime requirements for training jobs
+├── scripts/                        # Core scripts
+│   ├── setup.sh                    # Environment setup (hybrid conda/pip)
+│   ├── train.py                    # Unified training script
+│   └── inference.py                # Inference endpoint script
+└── notebooks/                      # Jupyter notebooks
+    ├── 01_environment_setup.ipynb  # Setup and verification
+    ├── 02_gpu_training.ipynb       # GPU training on SageMaker
+    └── 03_cpu_inference.ipynb      # CPU inference deployment
 ```
 
-## 🎯 Quick Start (3 Steps)
+## 🎯 Quick Start
 
-### Step 1: Setup Environment
+### Step 1: Environment Setup
 
 ```bash
-# From SageMaker terminal:
-cd /home/ec2-user/SageMaker/gl_rl_model
-bash sagemaker/1_setup/setup.sh
+# In SageMaker terminal
+cd /home/ec2-user/SageMaker
+git clone https://github.com/maddinenisri/gl_rl_model.git
+cd gl_rl_model
+bash sagemaker/scripts/setup.sh
 ```
 
-Or use the notebook: `sagemaker/1_setup/Setup_Environment.ipynb`
+### Step 2: GPU Training
 
-### Step 2: Train Model (GPU)
+Open `notebooks/02_gpu_training.ipynb` to:
+- Configure training job
+- Launch on GPU instances (ml.g5.xlarge)
+- Use spot instances for 70% cost savings
+- Monitor training progress
 
-Open `sagemaker/2_training/GPU_Training.ipynb` to:
-- Launch GPU training jobs
-- Use spot instances (70% savings)
-- Monitor progress
-- Download trained models
+### Step 3: CPU Inference
 
-### Step 3: Run Inference (CPU)
-
-Open `sagemaker/3_inference/CPU_Inference.ipynb` to:
-- Load trained models
-- Generate SQL from queries
-- Batch process
-- Deploy as endpoint
+Open `notebooks/03_cpu_inference.ipynb` to:
+- Deploy trained model
+- Run batch inference
+- Create REST API endpoint
 
 ## 💰 Cost Optimization
 
-| Task | Instance | Cost | Duration | Total |
-|------|----------|------|----------|-------|
-| Development | ml.t2.medium | $0.05/hr | Ongoing | Variable |
-| Training | ml.g5.xlarge spot | $0.30/hr | 2-4 hrs | $0.60-$1.20 |
-| Inference | ml.t2.medium | $0.05/hr | As needed | Variable |
+| Task | Instance Type | On-Demand | Spot | Recommended |
+|------|--------------|-----------|------|-------------|
+| Development | ml.t3.xlarge | $0.17/hr | N/A | ✅ |
+| Training | ml.g5.xlarge | $1.00/hr | $0.30/hr | ✅ Spot |
+| Inference | ml.m5.xlarge | $0.23/hr | N/A | ✅ |
 
-### Tips:
-- ✅ Always use spot instances for training
+### Tips for Cost Savings:
+- ✅ Always use spot instances for training (70% savings)
 - ✅ Stop notebook instances when not in use
-- ✅ Use Training Jobs instead of GPU notebooks
-- ✅ Set up budget alerts in AWS
+- ✅ Use ml.t3.xlarge for development (sufficient memory)
+- ✅ Set up AWS budget alerts
 
-## 🖥️ Instance Types
+## 🔧 Training Configuration
 
-### CPU Instances (Development/Inference)
-- **ml.t2.medium**: $0.05/hr - 4GB RAM (⚠️ Too small for setup, conda may fail)
-- **ml.t3.xlarge**: $0.17/hr - 16GB RAM (✅ Recommended minimum)
-- **ml.m5.xlarge**: $0.23/hr - 16GB RAM - Production inference
-- **ml.t3.2xlarge**: $0.33/hr - 32GB RAM - Comfortable development
+### Basic Training Job
 
-### GPU Instances (Training)
-- **ml.g5.xlarge**: $1.00/hr ($0.30 spot) - Best value, A10G 24GB
-- **ml.g4dn.xlarge**: $0.73/hr ($0.35 spot) - Budget option, T4 16GB
-- **ml.p3.2xlarge**: $3.83/hr ($1.15 spot) - Fast training, V100 16GB
+```python
+from sagemaker.pytorch import PyTorch
 
-## 📊 Terraform Resources
+estimator = PyTorch(
+    entry_point='train.py',
+    source_dir='sagemaker/scripts',
+    role=role,
+    instance_type='ml.g5.xlarge',
+    instance_count=1,
+    framework_version='2.0.0',
+    py_version='py310',
+    hyperparameters={
+        'epochs': 3,
+        'batch_size': 4,
+        'learning_rate': 3e-5,
+        'model_name': 'Qwen/Qwen2.5-Coder-1.5B-Instruct'
+    },
+    use_spot_instances=True,  # Save costs
+    max_wait=7200,
+    max_run=3600
+)
 
-The infrastructure is managed by Terraform in `/terraform`:
-- S3 bucket for data and models
-- IAM roles and policies
-- SageMaker notebook instance
-- Budget alerts and monitoring
+estimator.fit({'training': f's3://{bucket}/data/training'})
+```
+
+## 🚀 Deployment
+
+### Deploy Inference Endpoint
+
+```python
+from sagemaker.pytorch import PyTorchModel
+
+model = PyTorchModel(
+    model_data=estimator.model_data,
+    role=role,
+    framework_version='2.0.0',
+    py_version='py310',
+    entry_point='inference.py',
+    source_dir='sagemaker/scripts'
+)
+
+predictor = model.deploy(
+    initial_instance_count=1,
+    instance_type='ml.m5.xlarge'
+)
+```
+
+### Test Inference
+
+```python
+result = predictor.predict({
+    'query': 'Show me all customers',
+    'context': 'customers(id, name, email, created_at)'
+})
+print(result['sql'])
+```
 
 ## 🔧 Troubleshooting
 
-### Installation Issues
-- Use conda for compiled packages: `%conda install -c conda-forge sentencepiece pyarrow`
-- Use pip for Python packages: `%pip install transformers datasets peft trl`
+### Common Issues and Solutions
 
-### GPU Training
-- If spot capacity unavailable, try different region or instance type
-- Enable checkpointing for spot interruption recovery
+| Issue | Solution |
+|-------|----------|
+| `ModuleNotFoundError: datasets` | Script auto-installs dependencies at runtime |
+| `ResourceLimitExceeded` for spot | Request quota increase or use on-demand |
+| `GLIBCXX` version error | Run setup.sh to install system libraries |
+| Out of memory | Use larger instance or reduce batch size |
+| Version conflicts | Use requirements in `requirements/` folder |
 
-### Memory Issues
-- Use gradient checkpointing: `gradient_checkpointing=True`
-- Reduce batch size
-- Use mixed precision: `fp16=True`
+### Dependency Management
 
-## 📚 Additional Resources
+The project uses a **hybrid approach**:
+- **Conda**: System libraries (gcc, libstdcxx-ng) and compiled packages (sentencepiece, pyarrow)
+- **Pip**: Python packages with specific version constraints
 
-- [SageMaker Documentation](https://docs.aws.amazon.com/sagemaker/)
-- [Hugging Face on SageMaker](https://huggingface.co/docs/sagemaker/)
-- [AWS Cost Management](https://console.aws.amazon.com/cost-management/)
+This ensures compatibility while avoiding compilation issues on SageMaker.
 
-## 🎓 Model Details
+### Memory Requirements
+
+| Instance Type | Memory | Use Case |
+|--------------|--------|----------|
+| ml.t2.medium | 4GB | ❌ Too small for setup |
+| ml.t3.xlarge | 16GB | ✅ Development |
+| ml.g5.xlarge | 24GB | ✅ Training |
+| ml.m5.xlarge | 16GB | ✅ Inference |
+
+## 📊 Model Details
 
 - **Base Model**: Qwen/Qwen2.5-Coder-1.5B-Instruct
 - **Task**: SQL generation from natural language
 - **Method**: LoRA fine-tuning (r=8, alpha=16)
 - **Training**: 3 epochs on query-SQL pairs
+- **Parameters**: ~30M trainable (2% of total)
 
-## 🔧 Troubleshooting Common Issues
+## 🛠️ Development Workflow
 
-### Dependency Conflicts
+1. **Setup**: Run `setup.sh` once per instance
+2. **Develop**: Use notebooks for experimentation
+3. **Train**: Launch training jobs with `train.py`
+4. **Deploy**: Use `inference.py` for endpoints
+5. **Monitor**: Check CloudWatch logs and metrics
 
-If you encounter dependency conflicts during setup:
+## 📈 Performance Metrics
 
-1. **Clean Installation**:
-   ```bash
-   # Remove conflicting packages
-   pip uninstall -y dill multiprocess fsspec s3fs botocore boto3
-   pip cache purge
+Expected performance on test set:
+- **Accuracy**: ~85% exact match
+- **BLEU Score**: ~0.75
+- **Inference Time**: <100ms per query
+- **Training Time**: ~30 min for 3 epochs
 
-   # Reinstall with fixed versions
-   pip install -r sagemaker/1_setup/requirements-sagemaker.txt
-   ```
+## 🔐 Security Best Practices
 
-2. **Verify Installation**:
-   ```bash
-   python sagemaker/1_setup/verify_setup.py
-   ```
+- ✅ Use IAM roles, not credentials
+- ✅ Encrypt S3 buckets
+- ✅ Use VPC endpoints for private access
+- ✅ Enable CloudTrail logging
+- ✅ Regular model versioning
 
-### Common Error Solutions
+## 📚 Additional Resources
 
-| Error | Solution |
-|-------|----------|
-| `ImportError: libstdc++.so.6: version GLIBCXX_3.4.29 not found` | Run: `conda install -c conda-forge gcc_linux-64 libstdcxx-ng` |
-| `botocore version conflict` | Install specific versions: `pip install botocore==1.40.21 boto3==1.40.21` |
-| `fsspec/s3fs incompatibility` | Install matching versions: `pip install fsspec==2025.7.0 s3fs==2025.7.0` |
-| `multiprocess version error` | Update: `pip install 'dill>=0.4.0' 'multiprocess>=0.70.18'` |
-| `Out of memory during conda install` | Use pip instead: `pip install sentencepiece pyarrow` |
-
-### Memory Issues on ml.t2.medium
-
-For ml.t2.medium instances (4GB RAM):
-
-1. **Skip conda installations**:
-   ```bash
-   # Use pip for everything
-   pip install sentencepiece pyarrow
-   pip install -r sagemaker/1_setup/requirements-sagemaker.txt
-   ```
-
-2. **Clear memory before installation**:
-   ```bash
-   # Stop Jupyter kernel
-   pkill -f jupyter
-
-   # Clear pip cache
-   pip cache purge
-
-   # Run setup
-   bash sagemaker/1_setup/setup.sh
-   ```
-
-### AWS Connectivity Issues
-
-If S3 access fails:
-
-1. **Check IAM role**:
-   - Ensure SageMaker execution role has S3 access
-   - Add `AmazonS3FullAccess` policy if needed
-
-2. **Verify credentials**:
-   ```python
-   import boto3
-   s3 = boto3.client('s3')
-   s3.list_buckets()  # Should list your buckets
-   ```
-
-### Clean Reinstallation
-
-For a complete fresh start:
-
-```bash
-# Navigate to SageMaker directory
-cd /home/ec2-user/SageMaker
-
-# Remove existing repo
-rm -rf gl_rl_model
-
-# Clone fresh
-git clone https://github.com/maddinenisri/gl_rl_model.git
-cd gl_rl_model
-
-# Run new setup
-bash sagemaker/1_setup/setup.sh
-```
-
-### Logs and Debugging
-
-Setup logs are saved to `/tmp/sagemaker_setup_[timestamp].log`
-
-To view the latest log:
-```bash
-ls -lt /tmp/sagemaker_setup_*.log | head -1
-tail -f /tmp/sagemaker_setup_*.log  # Follow log in real-time
-```
+- [SageMaker Documentation](https://docs.aws.amazon.com/sagemaker/)
+- [PyTorch on SageMaker](https://sagemaker.readthedocs.io/en/stable/frameworks/pytorch/)
+- [Spot Instance Best Practices](https://docs.aws.amazon.com/sagemaker/latest/dg/model-managed-spot-training.html)
+- [Cost Management](https://console.aws.amazon.com/cost-management/)
 
 ---
 
-**Remember**: Always stop your SageMaker notebook instance when not in use to avoid charges!
+**⚠️ Remember**: Always stop SageMaker notebook instances when not in use to avoid charges!
