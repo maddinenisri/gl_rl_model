@@ -18,6 +18,11 @@ if IS_SAGEMAKER_TRAINING:
     # Install required packages for SageMaker training container
     import subprocess
     print("Installing required packages for SageMaker training...")
+
+    # First, upgrade transformers to fix compatibility issues
+    print("Upgrading transformers for compatibility...")
+    subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--upgrade', 'transformers>=4.36.0'])
+
     requirements_file = Path(__file__).parent.parent / 'requirements' / 'sagemaker-training.txt'
     if requirements_file.exists():
         subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-r', str(requirements_file)])

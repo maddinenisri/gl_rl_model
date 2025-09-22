@@ -1,5 +1,6 @@
 # Minimal requirements for SageMaker training container
 # These will be installed at runtime in the training job
+transformers>=4.36.0
 datasets>=2.14.0
 peft>=0.6.0
 accelerate>=0.24.0
