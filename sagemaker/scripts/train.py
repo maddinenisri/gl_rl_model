@@ -27,13 +27,14 @@ if IS_SAGEMAKER_TRAINING:
     # Install specific compatible versions in correct order
     print("Installing compatible package versions...")
 
-    # Install tokenizers first with correct version (matching pyproject.toml)
-    subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'tokenizers>=0.21.2,<0.23.0'])
+    # Install tokenizers first with a version compatible with transformers
+    subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'tokenizers==0.20.3'])
+    print("✓ Installed tokenizers==0.20.3")
 
-    # Then install transformers and other packages (use newer version compatible with tokenizers)
+    # Then install transformers and other packages (compatible with tokenizers 0.20.x)
     packages = [
-        'transformers==4.46.0',  # Compatible with tokenizers 0.21+
-        'accelerate>=0.24.0',    # Compatible with newer transformers
+        'transformers==4.36.2',  # Compatible with tokenizers 0.20.x
+        'accelerate==0.24.0',    # Compatible with transformers 4.36
         'datasets>=2.14.0',
         'peft>=0.6.0',
         'sentencepiece>=0.1.99',
@@ -52,16 +53,31 @@ if IS_SAGEMAKER_TRAINING:
 
     for package in packages:
         print(f"Installing {package}...")
-        subprocess.check_call([sys.executable, '-m', 'pip', 'install', package])
+        try:
+            subprocess.check_call([sys.executable, '-m', 'pip', 'install', package])
+            print(f"✓ Successfully installed {package}")
+        except subprocess.CalledProcessError as e:
+            print(f"✗ Failed to install {package}: {e}")
+            raise
+
+    # Verify installations
+    print("\nVerifying package versions...")
+    result = subprocess.run([sys.executable, '-m', 'pip', 'list'], capture_output=True, text=True)
+    for line in result.stdout.split('\n'):
+        if any(pkg in line.lower() for pkg in ['tokenizers', 'transformers', 'torch', 'accelerate', 'peft']):
+            print(f"  {line.strip()}")
 
 try:
+    print("\n=== Starting imports ===")
     import torch
     import numpy as np
-    print(f"PyTorch version: {torch.__version__}")
-    print(f"CUDA available: {torch.cuda.is_available()}")
+    print(f"✓ PyTorch version: {torch.__version__}")
+    print(f"  CUDA available: {torch.cuda.is_available()}")
     if torch.cuda.is_available():
-        print(f"GPU: {torch.cuda.get_device_name(0)}")
+        print(f"  GPU: {torch.cuda.get_device_name(0)}")
+        print(f"  GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.2f} GB")
 
+    print("\nImporting transformers...")
     from transformers import (
         AutoModelForCausalLM,
         AutoTokenizer,
@@ -70,18 +86,39 @@ try:
         DataCollatorForSeq2Seq
     )
     import transformers
-    print(f"Transformers version: {transformers.__version__}")
+    print(f"✓ Transformers version: {transformers.__version__}")
 
+    # Check tokenizers version
+    import tokenizers
+    print(f"✓ Tokenizers version: {tokenizers.__version__}")
+
+    print("\nImporting datasets...")
     from datasets import load_dataset
     import datasets
-    print(f"Datasets version: {datasets.__version__}")
+    print(f"✓ Datasets version: {datasets.__version__}")
 
+    print("\nImporting PEFT...")
     from peft import LoraConfig, get_peft_model, TaskType
     import peft
-    print(f"PEFT version: {peft.__version__}")
+    print(f"✓ PEFT version: {peft.__version__}")
 
+    print("\n=== All imports successful ===\n")
+
+except ImportError as e:
+    print(f"\n✗ ERROR during imports: {str(e)}")
+    print("\nDetailed import error information:")
+    import traceback
+    traceback.print_exc()
+
+    # Try to provide helpful debugging info
+    print("\n=== Debugging Information ===")
+    print("Python version:", sys.version)
+    print("Python executable:", sys.executable)
+    print("\nInstalled packages:")
+    subprocess.run([sys.executable, '-m', 'pip', 'list'], check=False)
+    raise
 except Exception as e:
-    print(f"ERROR during imports: {str(e)}")
+    print(f"\n✗ Unexpected ERROR: {str(e)}")
     import traceback
     traceback.print_exc()
     raise
