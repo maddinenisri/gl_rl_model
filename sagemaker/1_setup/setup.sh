@@ -47,9 +47,11 @@ fi
 
 echo ""
 echo "🔧 Fixing GLIBCXX issue first..."
-# Update conda and libstdc++ to fix GLIBCXX error
-conda update -n base -c defaults conda -y -q
+# Force update libstdc++ to get GLIBCXX_3.4.29
+conda install -c conda-forge gcc_linux-64 -y -q
 conda install -c conda-forge libstdcxx-ng -y -q
+# Export library path to use the updated libstdc++
+export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
 
 echo ""
 echo "📦 Installing dependencies..."
@@ -77,17 +79,21 @@ pip install -q transformers 'datasets==2.21.0' peft trl accelerate huggingface-h
 # Step 4: Fix version conflicts - install compatible versions
 echo ""
 echo "Step 4/4: Fixing version conflicts..."
-# Note: multiprocess==0.70.16 for datasets compatibility (pathos may show warning)
+# Fix all known conflicts
 pip install -q --force-reinstall \
     'fsspec==2024.6.1' \
-    'dill>=0.3.8' \
+    's3fs==2024.6.1' \
+    'dill==0.3.8' \
     'multiprocess==0.70.16' \
     'numpy==1.26.4' \
     'protobuf==6.31.0' \
+    'botocore>=1.39.9,<1.39.12' \
+    'aiobotocore>=2.13.0' \
     pandas tqdm aiohttp
 
-# Note: This may show a warning about pathos needing multiprocess>=0.70.18
-# but datasets 2.21.0 requires <0.70.17, so we use 0.70.16 as compromise
+# Expected warnings:
+# - pathos wants multiprocess>=0.70.18 (we use 0.70.16 for datasets)
+# - These are non-critical and the packages will still work
 
 echo ""
 echo "📥 Setting up training data..."
