@@ -61,9 +61,10 @@ Open `sagemaker/3_inference/CPU_Inference.ipynb` to:
 ## 🖥️ Instance Types
 
 ### CPU Instances (Development/Inference)
-- **ml.t2.medium**: $0.05/hr - Basic development
-- **ml.t3.xlarge**: $0.17/hr - Better performance
-- **ml.m5.xlarge**: $0.23/hr - Production inference
+- **ml.t2.medium**: $0.05/hr - 4GB RAM (⚠️ Too small for setup, conda may fail)
+- **ml.t3.xlarge**: $0.17/hr - 16GB RAM (✅ Recommended minimum)
+- **ml.m5.xlarge**: $0.23/hr - 16GB RAM - Production inference
+- **ml.t3.2xlarge**: $0.33/hr - 32GB RAM - Comfortable development
 
 ### GPU Instances (Training)
 - **ml.g5.xlarge**: $1.00/hr ($0.30 spot) - Best value, A10G 24GB

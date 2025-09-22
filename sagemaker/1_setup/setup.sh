@@ -10,10 +10,18 @@
 
 set -e
 
-# Check available memory
+# Check available memory and warn if too low
 echo "Checking system resources..."
 free -h
-echo ""
+TOTAL_MEM=$(free -m | awk 'NR==2{print $2}')
+if [ "$TOTAL_MEM" -lt 8000 ]; then
+    echo ""
+    echo "⚠️ WARNING: System has less than 8GB RAM (${TOTAL_MEM}MB)"
+    echo "   ml.t2.medium (4GB) is too small for conda installations"
+    echo "   Consider upgrading to ml.t3.xlarge (16GB) or higher"
+    echo "   Or use pip-only installation (see instructions below)"
+    echo ""
+fi
 
 echo "========================================="
 echo "🚀 GL RL Model - SageMaker Setup"
@@ -47,8 +55,13 @@ fi
 
 echo ""
 echo "🔧 Fixing GLIBCXX issue first..."
+# Update conda itself first
+echo "  Updating conda..."
+conda update -n base -c defaults conda -y -q
 # Force update libstdc++ to get GLIBCXX_3.4.29
+echo "  Installing gcc_linux-64..."
 conda install -c conda-forge gcc_linux-64 -y -q
+echo "  Installing libstdcxx-ng..."
 conda install -c conda-forge libstdcxx-ng -y -q
 # Export library path to use the updated libstdc++
 export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
