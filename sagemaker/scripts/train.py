@@ -35,10 +35,10 @@ if IS_SAGEMAKER_TRAINING:
                           'accelerate==0.24.1'])
     print("✓ Installed transformers==4.35.0, tokenizers==0.14.1, accelerate==0.24.1")
 
-    # Then install other packages
+    # Then install other packages with specific compatible versions
     packages = [
-        'datasets>=2.14.0',
-        'peft>=0.6.0',
+        'datasets==2.14.0',  # Specific version for compatibility
+        'peft==0.6.0',       # Older PEFT version compatible with accelerate 0.24.1
         'sentencepiece>=0.1.99',
         'protobuf>=3.20.0,<5.0.0',
         'safetensors>=0.3.1',
