@@ -27,13 +27,13 @@ if IS_SAGEMAKER_TRAINING:
     # Install specific compatible versions in correct order
     print("Installing compatible package versions...")
 
-    # Install tokenizers first with correct version
-    subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'tokenizers==0.15.0'])
+    # Install tokenizers first with correct version (matching pyproject.toml)
+    subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'tokenizers>=0.21.2,<0.23.0'])
 
-    # Then install transformers and other packages
+    # Then install transformers and other packages (use newer version compatible with tokenizers)
     packages = [
-        'transformers==4.36.2',  # Compatible with tokenizers 0.15
-        'accelerate==0.25.0',    # Compatible with transformers 4.36
+        'transformers==4.46.0',  # Compatible with tokenizers 0.21+
+        'accelerate>=0.24.0',    # Compatible with newer transformers
         'datasets>=2.14.0',
         'peft>=0.6.0',
         'sentencepiece>=0.1.99',
