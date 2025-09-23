@@ -171,8 +171,13 @@ class GLRLTrainer:
             jsonl_files = [sample_file]
 
         # Load dataset
-        dataset = load_dataset('json', data_files=[str(f) for f in jsonl_files])
-        dataset = dataset['train'].train_test_split(test_size=0.1, seed=42)
+        dataset = load_dataset('json', data_files=[str(f) for f in jsonl_files], split='train')
+
+        # Log what columns we have
+        logger.info(f"Dataset columns: {dataset.column_names}")
+
+        # Split into train/test
+        dataset = dataset.train_test_split(test_size=0.1, seed=42)
 
         logger.info(f"Training examples: {len(dataset['train'])}")
         logger.info(f"Evaluation examples: {len(dataset['test'])}")
@@ -254,13 +259,22 @@ class GLRLTrainer:
         prompts = []
         responses = []
 
-        # Handle both 'context' and 'reasoning' fields
-        context_field = 'context' if 'context' in examples else 'reasoning'
+        # Handle both 'reasoning' and 'context' fields dynamically
+        # Check which field exists in the data
+        context_field = None
+        if 'reasoning' in examples:
+            context_field = 'reasoning'
+        elif 'context' in examples:
+            context_field = 'context'
 
         for i in range(len(examples['query'])):
             query = examples['query'][i]
             sql = examples['sql'][i]
-            context = examples[context_field][i] if context_field in examples else ""
+
+            # Get context/reasoning if available
+            context = ""
+            if context_field:
+                context = examples[context_field][i]
 
             prompt = f"""<|im_start|>system
 You are a SQL expert. Generate SQL queries based on natural language questions.
