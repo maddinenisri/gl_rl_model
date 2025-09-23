@@ -269,6 +269,13 @@ class GLRLTrainer:
         )
 
         self.model = get_peft_model(self.model, lora_config)
+
+        # Fix for FP16 gradient unscaling: convert trainable params to float32
+        # This is required when using fp16=True with PEFT models
+        for param in self.model.parameters():
+            if param.requires_grad:
+                param.data = param.data.float()
+
         self.model.print_trainable_parameters()
 
     def preprocess_data(self, examples):
