@@ -5,12 +5,12 @@
 
 # Core ML frameworks
 torch==2.1.0
-tokenizers==0.14.1
-transformers==4.35.0
+tokenizers==0.15.0
+transformers==4.37.0  # Minimum version for Qwen2.5 support
 
 # Training libraries
 datasets==2.14.0
-accelerate==0.24.1
+accelerate==0.25.0
 peft==0.6.0  # Must be 0.6.0, newer versions require newer accelerate
 trl==0.7.0
 

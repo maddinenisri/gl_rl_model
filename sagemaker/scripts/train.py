@@ -27,13 +27,13 @@ if IS_SAGEMAKER_TRAINING:
     # Install specific compatible versions in correct order
     print("Installing compatible package versions...")
 
-    # Install specific versions that are known to work together
-    # Based on HuggingFace's compatibility matrix
+    # Install specific versions that support Qwen2.5 models
+    # Qwen2.5 requires transformers >= 4.37.0
     subprocess.check_call([sys.executable, '-m', 'pip', 'install',
-                          'transformers==4.35.0',
-                          'tokenizers==0.14.1',
-                          'accelerate==0.24.1'])
-    print("✓ Installed transformers==4.35.0, tokenizers==0.14.1, accelerate==0.24.1")
+                          'transformers==4.37.0',
+                          'tokenizers==0.15.0',
+                          'accelerate==0.25.0'])
+    print("✓ Installed transformers==4.37.0, tokenizers==0.15.0, accelerate==0.25.0")
 
     # Then install other packages with specific compatible versions
     packages = [
@@ -232,12 +232,25 @@ class GLRLTrainer:
         """Initialize model and tokenizer with LoRA"""
         logger.info(f"Loading model: {self.args.model_name}")
 
-        # Load tokenizer
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            self.args.model_name,
-            trust_remote_code=True,
-            padding_side='left'
-        )
+        # Load tokenizer with fallback for Qwen models
+        try:
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                self.args.model_name,
+                trust_remote_code=True,
+                padding_side='left'
+            )
+        except ValueError as e:
+            if "Qwen" in self.args.model_name:
+                logger.info("Qwen model detected, using trust_remote_code=True for tokenizer")
+                # For Qwen models, explicitly use trust_remote_code
+                self.tokenizer = AutoTokenizer.from_pretrained(
+                    self.args.model_name,
+                    trust_remote_code=True,
+                    use_fast=False,  # Use slow tokenizer for better compatibility
+                    padding_side='left'
+                )
+            else:
+                raise e
 
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
