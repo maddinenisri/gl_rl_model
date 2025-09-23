@@ -95,7 +95,7 @@ try:
     print(f"✓ Tokenizers version: {tokenizers.__version__}")
 
     print("\nImporting datasets...")
-    from datasets import load_dataset
+    from datasets import load_dataset, Dataset
     import datasets
     print(f"✓ Datasets version: {datasets.__version__}")
 
@@ -170,11 +170,24 @@ class GLRLTrainer:
                     f.write(json.dumps(item) + '\n')
             jsonl_files = [sample_file]
 
-        # Load dataset
-        dataset = load_dataset('json', data_files=[str(f) for f in jsonl_files], split='train')
+        # Load all data manually to avoid schema issues
+        all_data = []
+        for jsonl_file in jsonl_files:
+            logger.info(f"Loading {jsonl_file}")
+            with open(jsonl_file, 'r') as f:
+                for line in f:
+                    if line.strip():
+                        all_data.append(json.loads(line))
 
-        # Log what columns we have
-        logger.info(f"Dataset columns: {dataset.column_names}")
+        logger.info(f"Loaded {len(all_data)} examples")
+
+        # Check what fields we have
+        if all_data:
+            fields = list(all_data[0].keys())
+            logger.info(f"Data fields: {fields}")
+
+        # Convert to HuggingFace dataset format
+        dataset = Dataset.from_list(all_data)
 
         # Split into train/test
         dataset = dataset.train_test_split(test_size=0.1, seed=42)
@@ -185,32 +198,33 @@ class GLRLTrainer:
         return dataset
 
     def _create_sample_data(self):
-        """Create sample training data"""
+        """Create sample training data matching actual data format"""
+        # Use 'reasoning' field to match actual training data format
         return [
             {
-                "query": "Show me all customers",
-                "sql": "SELECT * FROM customers;",
-                "reasoning": "Selecting all records from customers table"
+                "query": "Show all active projects",
+                "sql": "SELECT * FROM PAC_MNT_PROJECTS WHERE Status = 'Active';",
+                "reasoning": "Filter projects by active status"
             },
             {
-                "query": "Get total sales by month",
-                "sql": "SELECT DATE_FORMAT(date, '%Y-%m') as month, SUM(amount) as total FROM sales GROUP BY month;",
-                "reasoning": "Grouping sales by month and calculating sum of amounts"
+                "query": "Find projects with budget over 100000",
+                "sql": "SELECT Project_Code, Project_Name, Budget FROM PAC_MNT_PROJECTS WHERE Budget > 100000;",
+                "reasoning": "Filter projects by budget threshold"
             },
             {
-                "query": "Find top 5 products by revenue",
-                "sql": "SELECT p.name, SUM(s.amount) as revenue FROM products p JOIN sales s ON p.id = s.product_id GROUP BY p.id ORDER BY revenue DESC LIMIT 5;",
-                "reasoning": "Joining products and sales tables, grouping by product, ordering by revenue"
+                "query": "List all companies",
+                "sql": "SELECT Company_Code, Company_Name FROM SRM_COMPANIES;",
+                "reasoning": "Select all companies from SRM_COMPANIES table"
             },
             {
-                "query": "List users who registered today",
-                "sql": "SELECT * FROM users WHERE DATE(created_at) = CURDATE();",
-                "reasoning": "Filtering users table by today's date"
+                "query": "Show project contracts",
+                "sql": "SELECT p.Project_Name, c.Contract_Value FROM PAC_MNT_PROJECTS p JOIN PROJCNTRTS c ON p.Project_Code = c.Project_Code;",
+                "reasoning": "Join projects with contracts to show contract values"
             },
             {
-                "query": "Calculate average order value",
-                "sql": "SELECT AVG(total_amount) as avg_order_value FROM orders;",
-                "reasoning": "Computing average of total_amount from orders table"
+                "query": "Get resource allocations",
+                "sql": "SELECT Project_Code, Staff_Code, Allocation_Percent FROM PROJSTAFF WHERE Allocation_Percent > 0;",
+                "reasoning": "Show staff allocations to projects"
             }
         ]
 
