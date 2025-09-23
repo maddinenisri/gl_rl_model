@@ -1,23 +1,24 @@
 # Locked requirements for SageMaker training
 # These versions have been tested to work together without conflicts
 # Generated: 2025-09-22
-# Updated: Using proven compatible versions from HuggingFace
+# Updated: Final working versions for Qwen2.5-Coder support
 
 # Core ML frameworks
 torch==2.1.0
 tokenizers==0.15.0
-transformers==4.37.0  # Minimum version for Qwen2.5 support
+transformers==4.37.2  # Minimum 4.37.0 required for Qwen2.5 support
 
 # Training libraries
 datasets==2.14.0
-accelerate==0.25.0
-peft==0.6.0  # Must be 0.6.0, newer versions require newer accelerate
+accelerate==0.26.1    # Compatible with transformers 4.37.2
+peft==0.8.2          # Compatible with accelerate 0.26.1
 trl==0.7.0
 
 # Model support
 sentencepiece==0.1.99
 protobuf==3.20.3
 safetensors==0.3.1
+tensorboard==2.15.0  # For training metrics
 
 # Utilities
 huggingface-hub==0.16.4

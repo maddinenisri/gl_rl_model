@@ -28,22 +28,22 @@ if IS_SAGEMAKER_TRAINING:
     print("Installing compatible package versions...")
 
     # Install specific versions that support Qwen2.5 models
-    # Using stable combination that works with Qwen2.5
+    # Qwen2.5 REQUIRES transformers >= 4.37.0
     subprocess.check_call([sys.executable, '-m', 'pip', 'install',
-                          'transformers==4.36.2',
-                          'tokenizers==0.15.2',
-                          'accelerate==0.25.0'])
-    print("✓ Installed transformers==4.36.2, tokenizers==0.15.2, accelerate==0.25.0")
+                          'transformers==4.37.2',
+                          'tokenizers==0.15.0',
+                          'accelerate==0.26.1'])
+    print("✓ Installed transformers==4.37.2, tokenizers==0.15.0, accelerate==0.26.1")
 
     # Then install other packages with specific compatible versions
     packages = [
         'datasets==2.14.0',  # Specific version for compatibility
-        'peft==0.7.0',       # Compatible with accelerate 0.25.0
+        'peft==0.8.2',       # Compatible with accelerate 0.26.1
         'sentencepiece>=0.1.99',
         'protobuf>=3.20.0,<5.0.0',
         'safetensors>=0.3.1',
         'huggingface-hub>=0.16.4',
-        'tensorboard>=2.11.0',  # Add tensorboard for metrics logging
+        'tensorboard==2.15.0',  # Specific version to avoid conflicts
         'filelock',
         'fsspec',
         'packaging',
@@ -233,25 +233,14 @@ class GLRLTrainer:
         """Initialize model and tokenizer with LoRA"""
         logger.info(f"Loading model: {self.args.model_name}")
 
-        # Load tokenizer with fallback for Qwen models
-        try:
-            self.tokenizer = AutoTokenizer.from_pretrained(
-                self.args.model_name,
-                trust_remote_code=True,
-                padding_side='left'
-            )
-        except ValueError as e:
-            if "Qwen" in self.args.model_name:
-                logger.info("Qwen model detected, using trust_remote_code=True for tokenizer")
-                # For Qwen models, explicitly use trust_remote_code
-                self.tokenizer = AutoTokenizer.from_pretrained(
-                    self.args.model_name,
-                    trust_remote_code=True,
-                    use_fast=False,  # Use slow tokenizer for better compatibility
-                    padding_side='left'
-                )
-            else:
-                raise e
+        # Load tokenizer - Qwen2.5 requires trust_remote_code
+        logger.info("Loading tokenizer with trust_remote_code=True for Qwen2.5...")
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            self.args.model_name,
+            trust_remote_code=True,
+            use_fast=True,  # Qwen2.5 works well with fast tokenizer
+            padding_side='left'
+        )
 
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
