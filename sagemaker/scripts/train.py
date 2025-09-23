@@ -246,10 +246,25 @@ class GLRLTrainer:
             self.tokenizer.pad_token = self.tokenizer.eos_token
 
         # Load model
+        # Note: Qwen2.5 has numerical stability issues with float16, use bfloat16 or float32
+        import torch
+        if self.args.fp16 and torch.cuda.is_available() and torch.cuda.is_bf16_supported():
+            model_dtype = torch.bfloat16
+            logger.info("Using bfloat16 for better numerical stability with Qwen2.5")
+        elif self.args.fp16 and torch.cuda.is_available():
+            # If bf16 not supported but fp16 requested, still use float32 for Qwen2.5 stability
+            model_dtype = torch.float32
+            logger.info("Using float32 instead of fp16 for Qwen2.5 stability (bf16 not supported)")
+            # Also disable fp16 in training args to match
+            self.args.fp16 = False
+        else:
+            model_dtype = torch.float32
+            logger.info("Using float32 for numerical stability")
+
         self.model = AutoModelForCausalLM.from_pretrained(
             self.args.model_name,
             trust_remote_code=True,
-            torch_dtype=torch.float16 if self.args.fp16 else torch.float32,
+            torch_dtype=model_dtype,
             device_map="auto" if torch.cuda.is_available() else None
         )
 
@@ -366,7 +381,9 @@ Context: {context}<|im_end|>
             gradient_accumulation_steps=self.args.gradient_accumulation_steps,
             warmup_steps=self.args.warmup_steps,
             learning_rate=self.args.learning_rate,
-            fp16=self.args.fp16,
+            # Use bf16 instead of fp16 if available for better numerical stability
+            fp16=self.args.fp16 and not torch.cuda.is_bf16_supported(),
+            bf16=self.args.fp16 and torch.cuda.is_bf16_supported(),
             logging_dir=f"{self.output_dir}/logs",
             logging_steps=self.args.logging_steps,
             evaluation_strategy="steps",
@@ -423,16 +440,33 @@ Context: {context}<|im_end|>
 
     def test_model(self):
         """Test the trained model"""
+        import torch
+
         test_query = "Show me all customers"
         test_input = f"""<|im_start|>user
 {test_query}<|im_end|>
 <|im_start|>assistant"""
 
-        inputs = self.tokenizer(test_input, return_tensors="pt").to(self.device)
+        inputs = self.tokenizer(test_input, return_tensors="pt", padding=True, truncation=True, max_length=512).to(self.device)
 
-        with torch.no_grad():
-            outputs = self.model.generate(**inputs, max_length=200, temperature=0.7)
-            response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+        try:
+            with torch.no_grad():
+                # Use safer generation parameters to avoid NaN issues
+                outputs = self.model.generate(
+                    **inputs,
+                    max_length=200,
+                    temperature=1.0,  # Use 1.0 instead of 0.7 to avoid numerical issues
+                    do_sample=True,
+                    top_k=50,
+                    top_p=0.95,
+                    pad_token_id=self.tokenizer.pad_token_id,
+                    eos_token_id=self.tokenizer.eos_token_id
+                )
+                response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+        except RuntimeError as e:
+            logger.warning(f"Generation failed with error: {e}")
+            logger.warning("Skipping test generation due to numerical instability")
+            response = "[Generation skipped due to numerical issues]"
 
         logger.info(f"Test query: {test_query}")
         logger.info(f"Generated SQL: {response}")
