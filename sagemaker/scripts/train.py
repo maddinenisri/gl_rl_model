@@ -38,11 +38,12 @@ if IS_SAGEMAKER_TRAINING:
     # Then install other packages with specific compatible versions
     packages = [
         'datasets==2.14.0',  # Specific version for compatibility
-        'peft==0.6.0',       # Older PEFT version compatible with accelerate 0.24.1
+        'peft==0.7.0',       # Compatible with accelerate 0.25.0
         'sentencepiece>=0.1.99',
         'protobuf>=3.20.0,<5.0.0',
         'safetensors>=0.3.1',
         'huggingface-hub>=0.16.4',
+        'tensorboard>=2.11.0',  # Add tensorboard for metrics logging
         'filelock',
         'fsspec',
         'packaging',
@@ -378,7 +379,7 @@ Context: {context}<|im_end|>
             load_best_model_at_end=True,
             metric_for_best_model="eval_loss",
             greater_is_better=False,
-            report_to=["tensorboard"] if IS_SAGEMAKER_TRAINING else [],
+            report_to=[],  # Disable tensorboard to avoid dependency issues
             push_to_hub=False,
             gradient_checkpointing=self.args.gradient_checkpointing,
             optim="adamw_torch",
