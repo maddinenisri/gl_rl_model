@@ -28,12 +28,12 @@ if IS_SAGEMAKER_TRAINING:
     print("Installing compatible package versions...")
 
     # Install specific versions that support Qwen2.5 models
-    # Qwen2.5 requires transformers >= 4.37.0
+    # Using stable combination that works with Qwen2.5
     subprocess.check_call([sys.executable, '-m', 'pip', 'install',
-                          'transformers==4.37.0',
-                          'tokenizers==0.15.0',
+                          'transformers==4.36.2',
+                          'tokenizers==0.15.2',
                           'accelerate==0.25.0'])
-    print("✓ Installed transformers==4.37.0, tokenizers==0.15.0, accelerate==0.25.0")
+    print("✓ Installed transformers==4.36.2, tokenizers==0.15.2, accelerate==0.25.0")
 
     # Then install other packages with specific compatible versions
     packages = [
@@ -86,7 +86,7 @@ try:
         AutoTokenizer,
         TrainingArguments,
         Trainer,
-        DataCollatorForSeq2Seq
+        DataCollatorForLanguageModeling
     )
     import transformers
     print(f"✓ Transformers version: {transformers.__version__}")
@@ -283,12 +283,10 @@ class GLRLTrainer:
         self.model.print_trainable_parameters()
 
     def preprocess_data(self, examples):
-        """Preprocess examples for training"""
-        prompts = []
-        responses = []
+        """Preprocess examples for training - create full conversation sequences"""
+        full_texts = []
 
         # Handle both 'reasoning' and 'context' fields dynamically
-        # Check which field exists in the data
         context_field = None
         if 'reasoning' in examples:
             context_field = 'reasoning'
@@ -304,36 +302,34 @@ class GLRLTrainer:
             if context_field:
                 context = examples[context_field][i]
 
-            prompt = f"""<|im_start|>system
+            # Create the full conversation including both prompt and response
+            full_conversation = f"""<|im_start|>system
 You are a SQL expert. Generate SQL queries based on natural language questions.
 Context: {context}<|im_end|>
 <|im_start|>user
 {query}<|im_end|>
-<|im_start|>assistant"""
+<|im_start|>assistant
+{sql}<|im_end|>"""
 
-            response = f"{sql}<|im_end|>"
+            full_texts.append(full_conversation)
 
-            prompts.append(prompt)
-            responses.append(response)
-
-        # Tokenize
+        # Tokenize the full conversations
         model_inputs = self.tokenizer(
-            prompts,
+            full_texts,
             max_length=self.args.max_length,
             truncation=True,
             padding=True
         )
 
-        # Tokenize responses
-        with self.tokenizer.as_target_tokenizer():
-            labels = self.tokenizer(
-                responses,
-                max_length=self.args.max_length,
-                truncation=True,
-                padding=True
-            )
+        # For causal LM training, labels are the same as input_ids
+        # We'll use -100 for padding tokens in the data collator
+        model_inputs["labels"] = model_inputs["input_ids"].copy()
 
-        model_inputs["labels"] = labels["input_ids"]
+        # Log sample for debugging
+        if len(full_texts) > 0:
+            logger.info(f"Sample tokenized sequence length: {len(model_inputs['input_ids'][0])}")
+            logger.info(f"Sample text (first 200 chars): {full_texts[0][:200]}...")
+
         return model_inputs
 
     def compute_metrics(self, eval_pred):
@@ -353,11 +349,17 @@ Context: {context}<|im_end|>
 
         # Preprocess data
         logger.info("Preprocessing data...")
+        logger.info(f"Dataset columns before preprocessing: {dataset['train'].column_names}")
+        logger.info(f"Sample data: {dataset['train'][0]}")
+
         tokenized_dataset = dataset.map(
             lambda x: self.preprocess_data(x),
             batched=True,
             remove_columns=dataset['train'].column_names
         )
+
+        logger.info(f"Tokenized dataset features: {tokenized_dataset['train'].features}")
+        logger.info(f"Tokenized dataset size: {len(tokenized_dataset['train'])}")
 
         # Training arguments
         training_args = TrainingArguments(
@@ -386,11 +388,11 @@ Context: {context}<|im_end|>
             remove_unused_columns=False
         )
 
-        # Data collator
-        data_collator = DataCollatorForSeq2Seq(
+        # Data collator for causal language modeling
+        data_collator = DataCollatorForLanguageModeling(
             tokenizer=self.tokenizer,
-            model=self.model,
-            padding=True
+            mlm=False,  # We're doing causal LM, not masked LM
+            pad_to_multiple_of=8  # Efficient for GPU
         )
 
         # Create trainer
